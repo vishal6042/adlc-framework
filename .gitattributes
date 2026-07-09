@@ -1,0 +1,13 @@
+# Portability: shell/python scripts MUST use LF so they run on Linux/macOS.
+# (A CRLF bash script fails with "\r: command not found" on Unix.)
+* text=auto eol=lf
+
+# PowerShell is happiest with CRLF on Windows.
+*.ps1 text eol=crlf
+
+# Treat these as text with forced LF regardless of extension.
+core/scripts/adlc      text eol=lf
+adapters/**/scripts/adlc text eol=lf
+*.sh   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
