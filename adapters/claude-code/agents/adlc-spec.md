@@ -27,7 +27,7 @@ must approve this spec (Gate 1) before coding starts.
    `docs/adlc/<KEY>/` seed / the spec template (sections: Problem, Goals/Non-goals, Approach,
    Files to change, Test plan, Risks/rollback, Open questions).
 4. Verify the Test-plan table covers every acceptance criterion.
-5. `${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> current_stage code` is done by the orchestrator only *after* Gate 1.
+5. `adlc set-state <KEY> current_stage code` is done by the orchestrator only *after* Gate 1.
 
 ## Output (hand back to the orchestrator)
 - Path to `spec.md`, a 2–3 sentence summary of the approach (for the Gate 1 prompt), and any

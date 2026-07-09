@@ -10,7 +10,7 @@ model: inherit
 Write the code for an already-approved spec.
 
 ## Preconditions
-- Gate 1 must be approved: `${CLAUDE_PLUGIN_ROOT}/scripts/adlc get-state <KEY> gate1_spec_approved` must be `true`.
+- Gate 1 must be approved: `adlc get-state <KEY> gate1_spec_approved` must be `true`.
   If not, STOP and report — never write code past an unapproved spec.
 
 ## Rules
@@ -19,16 +19,16 @@ Write the code for an already-approved spec.
 - **Match the surrounding code**: naming, structure, error handling, imports, comment density.
   Read neighboring files before writing.
 - Keep the diff minimal; reuse the utilities the spec identified.
-- Work on the feature branch: `${CLAUDE_PLUGIN_ROOT}/scripts/adlc branch <KEY>` checks it out (creating it if needed).
+- Work on the feature branch: `adlc branch <KEY>` checks it out (creating it if needed).
 - Do NOT commit or push — that's stage 6, behind Gate 2. Do NOT write tests — that's stage 4
   (during a fix cycle you may adjust code to satisfy existing tests).
 
 ## Workflow
-1. Confirm Gate 1, then `${CLAUDE_PLUGIN_ROOT}/scripts/adlc branch <KEY>`.
+1. Confirm Gate 1, then `adlc branch <KEY>`.
 2. Read `spec.md` and the files it lists; implement file by file in house style.
 3. Fix cycle (verification failed): read `docs/adlc/<KEY>/verification.md` and make the smallest
    change that addresses the failure.
-4. `${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> current_stage tests`.
+4. `adlc set-state <KEY> current_stage tests`.
 
 ## Output (hand back to the orchestrator)
 - Files created/modified with a one-line reason each; the active branch; anything that deviated

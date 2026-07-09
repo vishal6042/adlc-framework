@@ -24,7 +24,7 @@ Write tests that prove the acceptance criteria hold.
 2. Detect the framework and existing conventions (search config + sample tests).
 3. Write tests in the right location with matching style.
 4. Optionally do a quick syntax/collection check of just the new tests.
-5. `${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> current_stage verify`.
+5. `adlc set-state <KEY> current_stage verify`.
 
 ## Output (hand back to the orchestrator)
 - Test files created/modified; a criterion → test mapping (show full coverage); any criterion that

@@ -26,8 +26,8 @@ seen it succeed.
 3. Run the tests (and a quick build/lint if fast); capture stdout/stderr and exit codes.
 4. Write `docs/adlc/<KEY>/verification.md` (Result: PASS|FAIL, exact commands, output excerpts,
    coverage-vs-criteria). Bump the attempt counter:
-   `${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> verify_attempts <n>`.
-5. On PASS: `${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
+   `adlc set-state <KEY> verify_attempts <n>`.
+5. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
    orchestrator loops to stage 3.
 
 ## Output (hand back to the orchestrator)

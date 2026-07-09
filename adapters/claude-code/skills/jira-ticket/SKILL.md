@@ -6,20 +6,20 @@ description: Pick an existing ticket or create a new one for an ADLC run. Dual-m
 # jira-ticket
 
 Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria**. All the
-mechanics are in the `${CLAUDE_PLUGIN_ROOT}/scripts/adlc` script; this explains the intent and the `ticket.md` shape.
+mechanics are in the `adlc` script; this explains the intent and the `ticket.md` shape.
 
 ## Mode
-`${CLAUDE_PLUGIN_ROOT}/scripts/adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
-`${CLAUDE_PLUGIN_ROOT}/scripts/adlc set-state <KEY> jira_mode <mode>`.
+`adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
+`adlc set-state <KEY> jira_mode <mode>`.
 
 ## Pick vs create
 If the user referenced a key, **pick** it; otherwise **create**.
 - **Jira mode:**
-  - pick: `${CLAUDE_PLUGIN_ROOT}/scripts/adlc jira pick` lists open issues (`KEY  status  summary`); choose one.
-  - create: `${CLAUDE_PLUGIN_ROOT}/scripts/adlc jira create "<summary>" "<description>"` prints the new KEY. Put acceptance
+  - pick: `adlc jira pick` lists open issues (`KEY  status  summary`); choose one.
+  - create: `adlc jira create "<summary>" "<description>"` prints the new KEY. Put acceptance
     criteria into the description (one bullet per criterion).
-  - Then `${CLAUDE_PLUGIN_ROOT}/scripts/adlc init "<request>" <KEY>` seeds the local run dir under that real key.
-- **Local mode:** `${CLAUDE_PLUGIN_ROOT}/scripts/adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
+  - Then `adlc init "<request>" <KEY>` seeds the local run dir under that real key.
+- **Local mode:** `adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a
@@ -29,8 +29,8 @@ Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Cr
 ## Output
 Return the **key**, path to `ticket.md`, the **mode**, and the acceptance-criteria list.
 
-## Under the hood (for reference / non-${CLAUDE_PLUGIN_ROOT}/scripts/adlc hosts)
+## Under the hood (for reference / non-adlc hosts)
 Jira REST v3: `POST /rest/api/3/issue` (ADF description) to create, `GET /rest/api/3/search`
 (JQL) to pick, HTTP Basic auth `JIRA_EMAIL:JIRA_API_TOKEN`. Implemented with the Python stdlib in
 `scripts/jira_ticket.py` (no pip installs). Run it with a real interpreter (`py` on Windows,
-`python3` on macOS/Linux) — the `${CLAUDE_PLUGIN_ROOT}/scripts/adlc jira …` wrapper handles interpreter detection for you.
+`python3` on macOS/Linux) — the `adlc jira …` wrapper handles interpreter detection for you.

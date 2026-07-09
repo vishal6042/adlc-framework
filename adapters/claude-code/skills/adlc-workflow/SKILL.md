@@ -10,7 +10,7 @@ Single source of truth for how an ADLC run progresses. The orchestrator and ever
 ## Artifacts (in the target project, never the framework)
 ```
 docs/adlc/<KEY>/
-├── state.md          # the state machine below (managed via `${CLAUDE_PLUGIN_ROOT}/scripts/adlc get-state/set-state`)
+├── state.md          # the state machine below (managed via `adlc get-state/set-state`)
 ├── ticket.md         # stage 1
 ├── spec.md           # stage 2 (reviewed at Gate 1)
 └── verification.md   # stage 5
@@ -34,7 +34,7 @@ docs/adlc/tickets/<KEY>.md   # local-mode ticket mirror
 - **GATE 2 — before push:** human approves before anything is pushed. Approve & push / Request
   changes / Commit locally only / Abort.
 
-Record approvals with `${CLAUDE_PLUGIN_ROOT}/scripts/adlc approve <KEY> gate1|gate2`.
+Record approvals with `adlc approve <KEY> gate1|gate2`.
 
 ## state.md fields
 `key · title · created · branch · jira_mode(local|jira) · current_stage(intake|spec|code|tests|verify|ship|done) · gate1_spec_approved · gate2_push_approved · verify_attempts` plus a `## Log`.

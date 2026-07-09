@@ -43,10 +43,15 @@ Only Claude Code has real sub-agents, so there each stage is an isolated agent. 
 hosts the **same** runbook is followed inline, one role at a time — identical instructions,
 graceful degradation.
 
-## Install
+## Install — one shared copy, no marketplace
+
+The framework stays in **one common place** (this clone). The installer puts its `core/scripts`
+on your PATH once and drops each host's small instruction files into that host's **user-global**
+config dir — so **every project** can use it. Nothing is published to a marketplace or plugin
+registry, **not even for Claude Code**.
 
 ```bash
-git clone <this-repo-url> adlc-framework
+git clone <this-repo-url> adlc-framework      # keep this folder — it IS the install
 cd adlc-framework
 ./install.sh <host> [target-project-dir]      # macOS/Linux/Git Bash
 #   or on Windows PowerShell:
@@ -54,13 +59,19 @@ cd adlc-framework
 #   host = claude | cline | gemini | universal | all
 ```
 
-- **claude** → registers + installs the plugin (`claude plugin marketplace add adapters/claude-code`).
-- **cline** → copies `.clinerules/` into your project.
-- **gemini** → copies `.gemini/` + `GEMINI.md` into your project.
-- **universal** → copies `AGENTS.md` into your project.
+What each host installs (globally, for all projects):
 
-The installer always runs `build.py` first. For non-Claude hosts, add the scripts to your PATH so
-`adlc` resolves (the installer prints the exact `ADLC_HOME`/`PATH` lines).
+- **claude** → copies `agents/ skills/ commands/` into `~/.claude/`. `/adlc` appears in every project. No plugin, no marketplace.
+- **cline** → installs the rule + workflow into the global `~/Documents/Cline/{Rules,Workflows}/`.
+- **gemini** → installs the user command `~/.gemini/commands/adlc.toml` (+ `~/.gemini/GEMINI.md`).
+- **universal** → copies `AGENTS.md` into the target project (AGENTS.md is per-repo by nature).
+
+The installer also sets `ADLC_HOME` and adds `core/scripts` to your PATH so the `adlc` engine
+resolves in any project. **Open a new terminal afterward** so PATH/ADLC_HOME take effect. (A
+`adlc.cmd` shim makes `adlc` callable from cmd/PowerShell too, not just Git Bash.)
+
+> Prefer to keep it per-project instead of global? Point the host at a project-local copy — e.g.
+> put `.clinerules/` or `.gemini/` or `.claude/` in the repo. The instruction files are identical.
 
 ## Configure (optional)
 

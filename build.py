@@ -19,10 +19,11 @@ ROOT = Path(__file__).resolve().parent
 CORE = ROOT / "core"
 ADAPTERS = ROOT / "adapters"
 
-# How the deterministic entrypoint is invoked on each host. Core files use the
-# @ADLC@ token; we substitute per host.
-ADLC_CLAUDE = "${CLAUDE_PLUGIN_ROOT}/scripts/adlc"
-ADLC_PATH = "adlc"  # assumed on PATH (install.* adds scripts/ via ADLC_HOME)
+# How the deterministic entrypoint is invoked. All hosts call `adlc` on PATH
+# (install.* adds $ADLC_HOME/core/scripts to PATH). No marketplace/plugin path
+# is required, so the same mechanism works for every host including Claude Code.
+ADLC_CLAUDE = "adlc"
+ADLC_PATH = "adlc"  # on PATH via ADLC_HOME
 
 STAGE_ORDER = ["1-intake", "2-spec", "3-code", "4-tests", "5-verify", "6-ship"]
 SKILLS = ["adlc-workflow", "jira-ticket", "spec-design"]
@@ -60,16 +61,6 @@ def write(path: Path, content: str):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path
-
-
-def copy_runtime(dest_dir: Path):
-    """Copy scripts/ + templates/ so each adapter is self-contained."""
-    for sub_dir in ("scripts", "templates"):
-        src = CORE / sub_dir
-        dst = dest_dir / sub_dir
-        if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)
 
 
 def inlined_runbook(adlc: str) -> str:
@@ -132,7 +123,6 @@ def build_claude():
         "argument-hint": '"<feature request>" | resume <KEY> | status <KEY>',
     })
     write(out / "commands" / "adlc.md", cmd_fm + sub(orch, ADLC_CLAUDE))
-    copy_runtime(out)
     return out
 
 
@@ -160,7 +150,6 @@ def build_cline():
     write(out / ".clinerules" / "adlc.md", rule)
     # the workflow: full self-contained runbook
     write(out / ".clinerules" / "workflows" / "adlc.md", inlined_runbook(ADLC_PATH))
-    copy_runtime(out)
     return out
 
 
@@ -188,7 +177,6 @@ def build_gemini():
           '"<feature request>"` to execute it (Jira -> spec -> approval -> code -> tests -> '
           "verify -> push). Deterministic steps use the `adlc` script (keep it on PATH). "
           "Artifacts land in `docs/adlc/<KEY>/`.\n")
-    copy_runtime(out)
     return out
 
 
@@ -210,7 +198,6 @@ def build_universal():
         "---\n\n"
     )
     write(out / "AGENTS.md", header + inlined_runbook(ADLC_PATH))
-    copy_runtime(out)
     return out
 
 
