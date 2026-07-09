@@ -1,0 +1,14 @@
+{
+  "name": "adlc-framework-marketplace",
+  "owner": {
+    "name": "Vishal Bharti",
+    "email": "bharti.vishal4@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "adlc-framework",
+      "source": "./",
+      "description": "ADLC pipeline: Jira -> spec -> approval -> code -> tests -> verify -> push."
+    }
+  ]
+}
