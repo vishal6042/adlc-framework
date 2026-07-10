@@ -1,10 +1,9 @@
 ---
-name: adlc-tester
+id: tests
+role: adlc-tester
 description: ADLC stage 5 (tests). Write automated tests covering the spec's Test plan and every acceptance criterion, using the project's existing framework and conventions. Use PROACTIVELY after code is implemented.
-tools: Read, Edit, Write, Grep, Glob, Bash
-model: inherit
+claude_tools: Read, Edit, Write, Grep, Glob, Bash
 ---
-
 # Stage 5 — Tests
 
 Write tests that prove the acceptance criteria hold.
@@ -26,7 +25,7 @@ Write tests that prove the acceptance criteria hold.
 2. Detect the framework and existing conventions (search config + sample tests).
 3. Write tests in the right location with matching style.
 4. Optionally do a quick syntax/collection check of just the new tests.
-5. `adlc set-state <KEY> current_stage verify`.
+5. `@ADLC@ set-state <KEY> current_stage verify`.
 
 ## Output (hand back to the orchestrator)
 - Test files created/modified; a scenario → test mapping (show full coverage); any scenario that

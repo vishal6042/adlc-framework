@@ -4,8 +4,9 @@ description: Pick an existing ticket or create a new one for an ADLC run. Dual-m
 ---
 # jira-ticket
 
-Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria**. All the
-mechanics are in the `@ADLC@` script; this explains the intent and the `ticket.md` shape.
+Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria written in
+Gherkin** (see the `gherkin-criteria` skill). All the mechanics are in the `@ADLC@` script; this
+explains the intent and the `ticket.md` shape.
 
 ## Mode
 `@ADLC@ jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
@@ -15,18 +16,19 @@ mechanics are in the `@ADLC@` script; this explains the intent and the `ticket.m
 If the user referenced a key, **pick** it; otherwise **create**.
 - **Jira mode:**
   - pick: `@ADLC@ jira pick` lists open issues (`KEY  status  summary`); choose one.
-  - create: `@ADLC@ jira create "<summary>" "<description>"` prints the new KEY. Put acceptance
-    criteria into the description (one bullet per criterion).
+  - create: `@ADLC@ jira create "<summary>" "<description>"` prints the new KEY. Put the Gherkin
+    `Feature` + `Scenario` block into the description.
   - Then `@ADLC@ init "<request>" <KEY>` seeds the local run dir under that real key.
 - **Local mode:** `@ADLC@ init "<request>"` generates the next `ADLC-00N` key and seeds everything.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a
-**Description**, an **Acceptance criteria** checklist (specific + testable), and **Notes**. The
-`init` command writes a stub from the template; fill in the real content.
+**Description**, an **Acceptance criteria (Gherkin)** block — one `Feature` with `Scenario`s in
+`Given/When/Then` form — and **Notes**. The `init` command writes a stub from the template; fill in
+the real content.
 
 ## Output
-Return the **key**, path to `ticket.md`, the **mode**, and the acceptance-criteria list.
+Return the **key**, path to `ticket.md`, the **mode**, and the Gherkin acceptance scenarios.
 
 ## Under the hood (for reference / non-@ADLC@ hosts)
 Jira REST v3: `POST /rest/api/3/issue` (ADF description) to create, `GET /rest/api/3/search`

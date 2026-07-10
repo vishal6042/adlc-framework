@@ -6,6 +6,7 @@
 #
 # Usage:
 #   adlc init "<request>" [KEY]     create docs/adlc/<KEY>/ + state.md (+ local ticket)
+#   adlc constitution               create/print docs/adlc/constitution.md (project principles)
 #   adlc next-key                   print the next local ticket key (ADLC-00N)
 #   adlc status <KEY>               print the state file
 #   adlc get-state <KEY> <field>    read one state field
@@ -74,6 +75,17 @@ case "$cmd" in
         "$(adlc_templates_dir)/ticket.md" \
         | tee "$(key_dir "$key")/ticket.md" > "$(adlc_dir)/tickets/$key.md"
     echo "$key"
+    ;;
+
+  constitution) # create docs/adlc/constitution.md from template if absent; print its path
+    cfile="$(adlc_dir)/constitution.md"
+    if [ ! -f "$cfile" ]; then
+      mkdir -p "$(adlc_dir)"
+      today="$(date +%Y-%m-%d)"
+      sed -e "s|<DATE>|$today|g" "$(adlc_templates_dir)/constitution.md" > "$cfile"
+      echo "created $cfile — edit it to set your project's principles" >&2
+    fi
+    echo "$cfile"
     ;;
 
   status)      key="${1:?KEY required}"; cat "$(state_file "$key")" ;;
