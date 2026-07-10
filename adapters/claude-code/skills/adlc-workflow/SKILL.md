@@ -54,5 +54,7 @@ FAIL → bump `verify_attempts`, fix in stage 4, re-run tests + verify. After 3 
 surface the blocker to the human.
 
 ## Degradation
-No Jira creds → local tickets. No remote → local commit only. Always progress as far as possible
-rather than hard-failing.
+No requirement source (no Jira, no referenced item) → **interview the requester**
+(`requirement-elicitation`) and store locally; a tracker is optional, not required. No interactive
+user → infer requirements and mark assumptions `[NEEDS CLARIFICATION]`. No Jira creds → local
+tickets. No remote → local commit only. Always progress as far as possible rather than hard-failing.

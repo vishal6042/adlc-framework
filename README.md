@@ -42,6 +42,11 @@ design, approve the release).
 Governing all of it is a project **constitution** (`docs/adlc/constitution.md`) — a short set of
 principles every spec is checked against before Gate 1.
 
+**Requirements can come from anywhere.** Intake is source-agnostic: a referenced item (Jira key /
+issue / doc) → Jira (if configured) → **interactive elicitation** (the agent interviews you) →
+stored in local files. A tracker is optional — with no Jira and only a one-line request, the intake
+agent *asks you the right questions* and builds the full requirements spec from your answers.
+
 ---
 
 ## 3. Solution at a glance
@@ -80,7 +85,7 @@ On single-agent hosts the same 7 roles run inline, one at a time.
 | # | Agent | Role | Tools (least privilege) | Produces |
 |---|-------|------|-------------------------|----------|
 | — | **`/adlc`** | **Orchestrator** — runs the pipeline, owns state, enforces gates | delegation + `AskUserQuestion` | `state.md` |
-| 1 | `adlc-jira` | Intake → requirements spec (**WHAT**): user stories, **Gherkin** criteria, FRs, success criteria | `Bash, Read, Write` | `ticket.md` |
+| 1 | `adlc-jira` | Intake → requirements spec (**WHAT**): user stories, **Gherkin** criteria, FRs, success criteria — from a tracker **or by interviewing you** | `Bash, Read, Write, AskUserQuestion` | `ticket.md` |
 | 2 | `adlc-spec` | Technical plan (**HOW**) + **Constitution Check**; **read-only on code** | `Read, Grep, Glob, Write` | `spec.md` |
 | 3 | `adlc-planner` | Decompose the approved spec into an ordered task list | `Read, Write, Grep, Glob` | `tasks.md` |
 | 4 | `adlc-coder` | Implement the tasks | `Read, Edit, Write, Grep, Glob, Bash` | code on a branch |
@@ -115,7 +120,7 @@ differs per tool. So a generator turns one `core/` into a thin adapter per host.
 core/  ── SINGLE SOURCE OF TRUTH (edit here) ─────────────────────────────
 │  orchestrator.md      the runbook (7 roles, 2 gates, retry loop)
 │  stages/*.md          one instruction file per agent
-│  skills/*.md          reusable know-how (jira, spec-design, gherkin-criteria, constitution, task-breakdown, lifecycle)
+│  skills/*.md          reusable know-how (jira, requirement-elicitation, spec-design, gherkin-criteria, constitution, task-breakdown, lifecycle)
 │  templates/*.md       constitution / ticket / spec / tasks / state / verification
 │  scripts/             DETERMINISTIC engine: adlc (bash), adlc.ps1, adlc.cmd, jira_ticket.py
 │
@@ -160,6 +165,7 @@ All mechanical work is a plain script — testable, reproducible, model-independ
 ```bash
 adlc constitution                      # create/open docs/adlc/constitution.md (project principles)
 adlc init "add a health endpoint"     # -> ADLC-001, seeds docs/adlc/ADLC-001/
+adlc clarifications ADLC-001           # list unresolved [NEEDS CLARIFICATION] (nonzero if any)
 adlc next-key                          # next local ticket key
 adlc jira mode | pick | create ...     # dual-mode ticketing (Jira REST or local)
 adlc get-state <KEY> <field>           # read pipeline state
@@ -203,8 +209,9 @@ docs/adlc/tickets/<KEY>.md   local-mode ticket mirror
 4. **Cross-OS** — `.gitattributes` forces LF on scripts (a CRLF bash script breaks on Linux);
    scripts are marked executable in git; PowerShell + cmd + bash all covered.
 5. **`model: inherit`** — no assumption about the host's default model.
-6. **Graceful degradation** — no Jira creds → local tickets; no git remote → local commit; a
-   failed push keeps the commit and reports it.
+6. **Graceful degradation** — no requirement source → intake **interviews you** and stores locally
+   (a tracker is optional); no interactive user → infer + flag `[NEEDS CLARIFICATION]`; no Jira
+   creds → local tickets; no git remote → local commit; a failed push keeps the commit and reports it.
 
 ---
 
@@ -282,6 +289,9 @@ even for Claude.** Open a new terminal afterward so PATH takes effect.
 - **Spec-Driven Development (spec-kit-aligned)** — a project **constitution** governs every run;
   requirements (WHAT) are separated from the technical plan (HOW); the approved plan is decomposed
   into a task list before code. Designs are scored against the constitution at Gate 1.
+- **Source-agnostic requirement gathering** — a tracker is optional. When none supplies the detail,
+  intake **interviews the requester** (spec-kit's *clarify*) and stores locally, so a thin request
+  still becomes a complete, testable requirements spec.
 - **Gherkin acceptance criteria** — every criterion is a `Given/When/Then` scenario, authored once
   at intake, frozen into the spec, and mapped one-to-one to a test. Unambiguous, testable, traceable.
 - **Human-in-the-loop at 2 gates**, not 0 and not every step — safety without friction.
@@ -309,7 +319,7 @@ adlc-framework/
 ├── core/              # single source of truth (edit here)
 │   ├── orchestrator.md
 │   ├── stages/{1-intake,2-spec,3-tasks,4-code,5-tests,6-verify,7-ship}.md
-│   ├── skills/{adlc-workflow,constitution,jira-ticket,spec-design,gherkin-criteria,task-breakdown}.md
+│   ├── skills/{adlc-workflow,constitution,jira-ticket,requirement-elicitation,spec-design,gherkin-criteria,task-breakdown}.md
 │   ├── templates/{constitution,ticket,spec,tasks,state,verification}.md
 │   └── scripts/{adlc, adlc.ps1, adlc.cmd, jira_ticket.py, lib.sh}
 ├── adapters/          # GENERATED by build.py — do not hand-edit

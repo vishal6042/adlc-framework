@@ -31,10 +31,18 @@ Ensure `docs/adlc/constitution.md` exists: `adlc constitution` seeds it from the
 missing. Its principles are the standard the spec is checked against at Gate 1. If it's still a
 template stub, note that and proceed with defaults — don't block the run.
 
+## Requirement source (stage 1 is source-agnostic)
+A tracker is optional. Stage 1 gathers requirements from the first available source: a **referenced
+item** (Jira key / issue / doc) → **Jira** (if configured) → **interactive elicitation** (interview
+the requester) → stored in **local files**. No Jira is a first-class path, not a failure. When the
+request is thin and no source has the detail, intake **interviews the user** (`AskUserQuestion` on
+Claude) rather than emitting a blank ticket. Headless with no user → infer and mark every
+assumption `[NEEDS CLARIFICATION]`.
+
 ## Pipeline
 | Stage | Role | Do after it returns |
 |-------|------|---------------------|
-| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists; state → spec |
+| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists (from a tracker or by elicitation); state → spec |
 | 2 spec | `stages/2-spec.md` | persist `spec.md` (HOW) + Constitution Check; **run GATE 1** |
 | 3 tasks | `stages/3-tasks.md` | `tasks.md` from the approved spec; state → code |
 | 4 code | `stages/4-code.md` | code on the feature branch, per `tasks.md` |
@@ -45,9 +53,10 @@ template stub, note that and proceed with defaults — don't block the run.
 After every stage, the role updates `current_stage`; append a line to the `## Log` in `state.md`.
 
 ## GATE 1 — approve the plan (after stage 2)
-Do not proceed to tasks/code until the user approves. Present the spec summary + the
-**Constitution Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or
-remaining `[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
+Do not proceed to tasks/code until the user approves. First run `adlc clarifications <KEY>` — if
+it lists anything, resolve those before approval. Present the spec summary + the **Constitution
+Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or remaining
+`[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
 - Approve → `adlc approve <KEY> gate1`, then continue to stage 3 (tasks).
 - Request changes → capture feedback, re-run stage 2, gate again.
 - Abort → set `current_stage` to `done`, log, stop.
@@ -89,13 +98,30 @@ Print a concise summary: KEY + title, branch, commit SHA, pushed?+compare URL, l
 
 Turn the request into a tracked ticket with a stable **KEY** and a complete **requirements spec —
 the WHAT and WHY**. This is the spec-kit *specify* step: describe the problem, not the solution.
-The technical design (the HOW) is stage 2 (`spec.md`) — write no design or code here. Works with
-or without a real Jira instance.
+The technical design (the HOW) is stage 2 (`spec.md`) — write no design or code here.
+
+**Requirements can come from anywhere.** A tracker is one source, not a prerequisite. Gather the
+detail from the best source available, and when none has it, **interview the requester** — never
+hand Gate 1 an empty or guessed ticket.
+
+## Source priority chain (use the first that applies)
+1. **Referenced item** — the user named a Jira key / issue / requirements doc → read it and use its
+   content as the starting point.
+2. **Jira** — configured (`adlc jira mode` = `jira`) and the user wants a new/picked issue →
+   create or pick it.
+3. **Interactive elicitation** — no usable source, or the request is a thin one-liner → gather the
+   requirements by interviewing the requester (see the `requirement-elicitation` skill).
+4. **Local file** — the store for everything above when Jira isn't in play; `adlc init` seeds it.
+
+Whatever the source, the *content* — stories, Gherkin scenarios, FRs, success criteria — is the
+same. The source only decides where the ticket is stored.
 
 ## Rules
 - All mechanical work goes through the `adlc` script — do not reimplement key generation,
-  state, or Jira calls by hand.
-- Jira vs local is automatic (`adlc jira mode`). Never echo secrets; creds come from env only.
+  state, or Jira calls by hand. Never echo secrets; creds come from env only.
+- **Elicit before guessing.** If you cannot write concrete Gherkin scenarios and functional
+  requirements from what you have, run the interview (`requirement-elicitation`) rather than
+  inventing them. If the request is already detailed, skip the interview.
 - **WHAT, not HOW.** No architecture, file names, or tech choices — those belong in `spec.md`.
 - **Acceptance criteria are written in Gherkin** — one `Feature` with 3–6 `Scenario`s in
   `Given/When/Then` form (see the `gherkin-criteria` skill). One concrete, observable behavior per
@@ -106,23 +132,29 @@ or without a real Jira instance.
   Surface these to the human — Gate 1 must not pass with any left unresolved.
 
 ## Workflow
-1. Detect mode: `adlc jira mode` → `jira` or `local`.
-2. Get a KEY + seed the run:
+1. **Pick the source** (chain above). Detect the tracker with `adlc jira mode` → `jira`/`local`.
+2. **Gather requirements:**
+   - Referenced item / Jira issue → read its detail.
+   - Otherwise, if the request is thin → **elicit** (interview via `AskUserQuestion` on Claude, a
+     short numbered list elsewhere; see `requirement-elicitation`). Headless/CI with no user →
+     infer and mark every assumption `[NEEDS CLARIFICATION]`; do not block.
+3. **Seed the run + KEY:**
    - **local:** `adlc init "<request>"` prints a new KEY (e.g. `ADLC-001`) and creates
      `docs/adlc/<KEY>/` with `state.md` + `ticket.md`.
-   - **jira:** create/pick the issue → `adlc jira create "<summary>" "<description>"` (prints the
-     KEY) or `adlc jira pick` (choose one), then `adlc init "<request>" <KEY>` to seed the
-     local run dir under the real key.
-3. Fill `docs/adlc/<KEY>/ticket.md`: Description, prioritized **User stories** (P1/P2/P3), the
-   Gherkin `Feature` block (happy path + ≥1 edge/error case), numbered **Functional requirements**,
-   measurable **Success criteria**, and **Edge cases**. In Jira mode, put the same content into the
-   issue description. Leave `[NEEDS CLARIFICATION]` markers wherever the request is underspecified.
-4. Record state: `adlc set-state <KEY> jira_mode <mode>` and
+   - **jira:** `adlc jira create "<summary>" "<description>"` (prints the KEY) or
+     `adlc jira pick`, then `adlc init "<request>" <KEY>` to seed the local run dir.
+4. **Fill** `docs/adlc/<KEY>/ticket.md` from the gathered requirements: Description, prioritized
+   **User stories** (P1/P2/P3), the Gherkin `Feature` block (happy path + ≥1 edge/error case),
+   numbered **Functional requirements**, measurable **Success criteria**, and **Edge cases**. In
+   Jira mode, mirror the same content into the issue description.
+5. **Check clarity:** `adlc clarifications <KEY>` lists any remaining `[NEEDS CLARIFICATION]`.
+6. Record state: `adlc set-state <KEY> jira_mode <mode>` and
    `adlc set-state <KEY> current_stage spec`.
 
 ## Output (hand back to the orchestrator)
-- The **KEY**, path to `ticket.md`, the **mode**, the Gherkin acceptance scenarios (by name), and
-  any **[NEEDS CLARIFICATION]** items the human must resolve.
+- The **KEY**, path to `ticket.md`, the **source** used (referenced / jira / elicited / local), the
+  Gherkin acceptance scenarios (by name), and any **[NEEDS CLARIFICATION]** items the human must
+  resolve.
 
 
 # Stage 2 — Technical plan / Spec  (→ GATE 1)
@@ -368,8 +400,10 @@ FAIL → bump `verify_attempts`, fix in stage 4, re-run tests + verify. After 3 
 surface the blocker to the human.
 
 ## Degradation
-No Jira creds → local tickets. No remote → local commit only. Always progress as far as possible
-rather than hard-failing.
+No requirement source (no Jira, no referenced item) → **interview the requester**
+(`requirement-elicitation`) and store locally; a tracker is optional, not required. No interactive
+user → infer requirements and mark assumptions `[NEEDS CLARIFICATION]`. No Jira creds → local
+tickets. No remote → local commit only. Always progress as far as possible rather than hard-failing.
 
 
 # constitution
@@ -411,13 +445,16 @@ the overall result, surfaced in the Gate 1 summary.
 
 # jira-ticket
 
-Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria written in
-Gherkin** (see the `gherkin-criteria` skill). All the mechanics are in the `adlc` script; this
-explains the intent and the `ticket.md` shape.
+Store the run's ticket and get a **key**. A tracker is **one source, not a prerequisite** — Jira is
+optional and local files always work. This skill covers *where the ticket lives and how it's keyed*;
+the *requirement content* (Gherkin criteria, FRs, success criteria) is gathered by the stage-1
+source chain — a referenced item, Jira, or by interviewing the requester
+(`requirement-elicitation`) when nothing else supplies it. All mechanics are in the `adlc` script.
 
 ## Mode
 `adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
-`adlc set-state <KEY> jira_mode <mode>`.
+`adlc set-state <KEY> jira_mode <mode>`. No Jira is not a blocker — local mode is a first-class
+path, not a degraded one.
 
 ## Pick vs create
 If the user referenced a key, **pick** it; otherwise **create**.
@@ -427,6 +464,9 @@ If the user referenced a key, **pick** it; otherwise **create**.
     `Feature` + `Scenario` block into the description.
   - Then `adlc init "<request>" <KEY>` seeds the local run dir under that real key.
 - **Local mode:** `adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
+
+If the request is too thin to fill the criteria, **elicit first** (`requirement-elicitation`), then
+create/seed the ticket with the gathered content.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a
@@ -442,6 +482,59 @@ Jira REST v3: `POST /rest/api/3/issue` (ADF description) to create, `GET /rest/a
 (JQL) to pick, HTTP Basic auth `JIRA_EMAIL:JIRA_API_TOKEN`. Implemented with the Python stdlib in
 `scripts/jira_ticket.py` (no pip installs). Run it with a real interpreter (`py` on Windows,
 `python3` on macOS/Linux) — the `adlc jira …` wrapper handles interpreter detection for you.
+
+
+# requirement-elicitation
+
+The universal fallback for requirement gathering. When there is **no Jira ticket, no issue, and no
+requirements doc** — or the request is a vague one-liner — don't just stamp out an empty template.
+**Interview the requester**, then write a complete `ticket.md`. This is spec-kit's *clarify* step,
+applied at intake.
+
+## When to elicit
+- The chosen source has no usable detail (local mode, or a tracker item that's just a title), **or**
+- the request is underspecified: you cannot write concrete Gherkin scenarios and functional
+  requirements from it without guessing.
+
+If the request is already detailed enough to write testable criteria, skip the interview — don't
+interrogate the user for its own sake.
+
+## What to ask (cover the gaps, in priority order)
+Ask about the dimensions you can't reasonably infer. Lead with the highest-leverage unknowns.
+1. **Problem & outcome** — what's broken/missing, and what does "done" look like for the user?
+2. **Users & context** — who uses this, and what's the current behavior?
+3. **Scope** — the must-haves for *this* change, and explicit **non-goals** / out-of-scope.
+4. **Acceptance behavior** — concrete examples of the happy path (these become Gherkin scenarios).
+5. **Edge cases & errors** — empty/invalid/unauthorized inputs, limits, concurrency, failure modes.
+6. **Constraints** — performance, security/data, compatibility, and any fixed tech choices.
+7. **Success criteria** — a measurable, technology-agnostic signal of success (feeds `SC-00N`).
+
+## How to ask (host-adaptive)
+- **Claude Code:** use `AskUserQuestion` — batch 2–4 crisp questions with sensible multiple-choice
+  options (always leaving room for a free-text answer). Prefer one well-chosen round; ask a second
+  round only if answers open a material new gap.
+- **Other interactive hosts:** ask a short **numbered list** of questions in one message; parse the
+  replies.
+- **Few and sharp.** 3–6 questions total. Offer a recommended default per question so the user can
+  accept fast. Never block on trivia you can decide yourself — decide it and note the assumption.
+
+## Converge
+1. Restate the requirements you now hold as a short **assumptions** summary ("Here's what I'll build
+   unless you correct me").
+2. Turn the answers into the ticket sections: user stories, the Gherkin `Feature`, functional
+   requirements (`FR-00N`), success criteria (`SC-00N`), edge cases.
+3. Mark anything still open with `[NEEDS CLARIFICATION: <question>]` — always include the question
+   **after the colon** (that colon form is what `adlc clarifications <KEY>` detects; the bare
+   `[NEEDS CLARIFICATION]` in template prose is ignored). Gate 1 must have none left.
+
+## Degradation (non-interactive / headless / CI)
+No user to interview? Do **not** hard-fail. Infer the most reasonable requirements from the request,
+write them, and mark **every** inferred decision with `[NEEDS CLARIFICATION]` so the human resolves
+them at Gate 1. Surface the list explicitly in the intake output.
+
+## Output
+A completed `ticket.md` (or Jira/issue description) plus the list of any remaining
+`[NEEDS CLARIFICATION]` items to carry into the Gate 1 review.
 
 
 # spec-design

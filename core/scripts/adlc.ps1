@@ -3,6 +3,7 @@
 #
 #   .\adlc.ps1 next-key
 #   .\adlc.ps1 constitution
+#   .\adlc.ps1 clarifications <KEY>
 #   .\adlc.ps1 init "<request>" [KEY]
 #   .\adlc.ps1 status <KEY>
 #   .\adlc.ps1 get-state <KEY> <field>
@@ -72,6 +73,16 @@ switch ($Cmd) {
     }
     $cfile
   }
+  "clarifications" {
+    $key = $Rest[0]; $found = $false
+    foreach ($f in @("docs/adlc/$key/ticket.md", "docs/adlc/$key/spec.md", "docs/adlc/$key/tasks.md")) {
+      if (-not (Test-Path $f)) { continue }
+      Select-String -Path $f -Pattern '\[NEEDS CLARIFICATION:' | ForEach-Object {
+        $found = $true; "{0}:{1}:{2}" -f $f, $_.LineNumber, $_.Line.Trim()
+      }
+    }
+    if ($found) { exit 1 } else { "no open clarifications for $key" }
+  }
   "status"      { Get-Content (StateFile $Rest[0]) }
   "get-state"   { Get-State $Rest[0] $Rest[1] }
   "set-state"   { Set-State $Rest[0] $Rest[1] $Rest[2]; "ok" }
@@ -100,6 +111,6 @@ switch ($Cmd) {
     $key
   }
   default {
-    "adlc.ps1 — deterministic ADLC ops. Subcommands: next-key, constitution, init, status, get-state, set-state, approve, compare-url."
+    "adlc.ps1 — deterministic ADLC ops. Subcommands: next-key, constitution, clarifications, init, status, get-state, set-state, approve, compare-url."
   }
 }
