@@ -1,11 +1,11 @@
 ---
 name: adlc-verifier
-description: ADLC stage 5 (verify). Auto-detect and run the project's tests/build/lint, then write a PASS/FAIL report to verification.md. Use PROACTIVELY after tests are written. On FAIL the orchestrator loops back to stage 3.
+description: ADLC stage 6 (verify). Auto-detect and run the project's tests/build/lint, then write a PASS/FAIL report to verification.md. Use PROACTIVELY after tests are written. On FAIL the orchestrator loops back to stage 4.
 tools: Read, Bash, Grep, Glob
 model: inherit
 ---
 
-# Stage 5 — Verify
+# Stage 6 — Verify
 
 Run the checks and report the truth. Never claim PASS without having actually run something and
 seen it succeed.
@@ -28,8 +28,8 @@ seen it succeed.
    coverage as Scenario → passing test). Bump the attempt counter:
    `adlc set-state <KEY> verify_attempts <n>`.
 5. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
-   orchestrator loops to stage 3.
+   orchestrator loops to stage 4.
 
 ## Output (hand back to the orchestrator)
 - **PASS** or **FAIL** (unambiguous); the exact commands run; on FAIL the specific failing
-  tests/errors so stage 3 can fix them.
+  tests/errors so stage 4 can fix them.

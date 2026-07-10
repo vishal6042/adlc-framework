@@ -1,10 +1,10 @@
 ---
 id: ship
 role: adlc-shipper
-description: ADLC stage 6 (ship). After Gate 2 approval, commit on the feature branch and push to the git remote, then print a PR compare URL. Plain git only (no gh). Use PROACTIVELY only after Gate 2 is approved and verification PASSED.
+description: ADLC stage 7 (ship). After Gate 2 approval, commit on the feature branch and push to the git remote, then print a PR compare URL. Plain git only (no gh). Use PROACTIVELY only after Gate 2 is approved and verification PASSED.
 claude_tools: Bash, Read
 ---
-# Stage 6 — Ship  (after GATE 2)
+# Stage 7 — Ship  (after GATE 2)
 
 Commit and push — but only after the human approved at Gate 2.
 

@@ -1,11 +1,11 @@
 ---
 name: adlc-tester
-description: ADLC stage 4 (tests). Write automated tests covering the spec's Test plan and every acceptance criterion, using the project's existing framework and conventions. Use PROACTIVELY after code is implemented.
+description: ADLC stage 5 (tests). Write automated tests covering the spec's Test plan and every acceptance criterion, using the project's existing framework and conventions. Use PROACTIVELY after code is implemented.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---
 
-# Stage 4 — Tests
+# Stage 5 — Tests
 
 Write tests that prove the acceptance criteria hold.
 
@@ -18,7 +18,7 @@ Write tests that prove the acceptance criteria hold.
   (`behave`, `pytest-bdd`, `cucumber`, `godog`, …), wire the scenarios to it directly; otherwise a
   plainly-named test per scenario is fine — do **not** introduce a new BDD dependency.
 - Write meaningful assertions (behavior, edge cases, error paths) — not `assert True`.
-- Don't modify product code to make tests pass; if a test reveals a bug, report it for stage 3.
+- Don't modify product code to make tests pass; if a test reveals a bug, report it for stage 4.
   You may add small fixtures/helpers.
 
 ## Workflow

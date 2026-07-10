@@ -2,6 +2,7 @@
 # Mirrors the common subcommands of the bash `adlc`. Deterministic, no LLM.
 #
 #   .\adlc.ps1 next-key
+#   .\adlc.ps1 constitution
 #   .\adlc.ps1 init "<request>" [KEY]
 #   .\adlc.ps1 status <KEY>
 #   .\adlc.ps1 get-state <KEY> <field>
@@ -60,6 +61,17 @@ function Compare-Url($branch) {
 
 switch ($Cmd) {
   "next-key"    { Next-Key }
+  "constitution" {
+    $cfile = "docs/adlc/constitution.md"
+    if (-not (Test-Path $cfile)) {
+      New-Item -ItemType Directory -Force "docs/adlc" | Out-Null
+      $today = (Get-Date -Format "yyyy-MM-dd")
+      (Get-Content (Join-Path $Templates "constitution.md") -Raw).Replace("<DATE>", $today) |
+        Set-Content $cfile -Encoding utf8
+      Write-Error "created $cfile — edit it to set your project's principles"
+    }
+    $cfile
+  }
   "status"      { Get-Content (StateFile $Rest[0]) }
   "get-state"   { Get-State $Rest[0] $Rest[1] }
   "set-state"   { Set-State $Rest[0] $Rest[1] $Rest[2]; "ok" }
@@ -88,6 +100,6 @@ switch ($Cmd) {
     $key
   }
   default {
-    "adlc.ps1 — deterministic ADLC ops. Subcommands: next-key, init, status, get-state, set-state, approve, compare-url."
+    "adlc.ps1 — deterministic ADLC ops. Subcommands: next-key, constitution, init, status, get-state, set-state, approve, compare-url."
   }
 }

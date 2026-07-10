@@ -1,7 +1,7 @@
 {
   "name": "adlc-framework",
   "displayName": "ADLC Framework",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agentic Development Life Cycle: Jira -> spec -> approval -> code -> tests -> verify -> git push, as orchestrated specialized agents. Generated from core/.",
   "author": {
     "name": "Vishal Bharti",

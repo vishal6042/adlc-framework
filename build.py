@@ -25,8 +25,9 @@ ADAPTERS = ROOT / "adapters"
 ADLC_CLAUDE = "adlc"
 ADLC_PATH = "adlc"  # on PATH via ADLC_HOME
 
-STAGE_ORDER = ["1-intake", "2-spec", "3-code", "4-tests", "5-verify", "6-ship"]
-SKILLS = ["adlc-workflow", "jira-ticket", "spec-design", "gherkin-criteria"]
+STAGE_ORDER = ["1-intake", "2-spec", "3-tasks", "4-code", "5-tests", "6-verify", "7-ship"]
+SKILLS = ["adlc-workflow", "constitution", "jira-ticket", "spec-design",
+          "gherkin-criteria", "task-breakdown"]
 
 
 # --- tiny frontmatter parser ----------------------------------------------
@@ -87,7 +88,7 @@ def build_claude():
     write(out / ".claude-plugin" / "plugin.json", json.dumps({
         "name": "adlc-framework",
         "displayName": "ADLC Framework",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "description": "Agentic Development Life Cycle: Jira -> spec -> approval -> code -> tests -> verify -> git push, as orchestrated specialized agents. Generated from core/.",
         "author": {"name": "Vishal Bharti", "email": "bharti.vishal4@gmail.com"},
         "keywords": ["adlc", "agentic", "workflow", "pipeline", "jira", "sdlc"],
