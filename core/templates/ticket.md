@@ -6,7 +6,9 @@
 - **Created:** <DATE>
 
 > Requirements spec (the **WHAT / WHY**). Technical design (the **HOW**) lives in `spec.md`.
-> Mark every unknown inline with **[NEEDS CLARIFICATION: question]** — Gate 1 must have none left.
+> Mark every unknown inline with a bracketed NEEDS-CLARIFICATION note **that states the question**
+> (the intake stage shows the exact form) — Gate 1 must have none left; check with
+> `adlc clarifications <KEY>`.
 
 ## Description
 <what is being asked and why; the current behavior and the desired outcome>

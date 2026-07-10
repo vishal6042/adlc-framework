@@ -1,17 +1,20 @@
 ---
 name: jira-ticket
-description: Pick an existing ticket or create a new one for an ADLC run. Dual-mode — Jira Cloud REST when JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN are set, otherwise local ticket files. Use at the start of an ADLC pipeline.
+description: Store an ADLC run's ticket in a tracker or local files, and get its key. Dual-mode — Jira Cloud REST when JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN are set, otherwise local ticket files. This is the storage/keying step; requirement *content* comes from the source chain in stage 1 (see requirement-elicitation). Use at the start of an ADLC pipeline.
 ---
 
 # jira-ticket
 
-Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria written in
-Gherkin** (see the `gherkin-criteria` skill). All the mechanics are in the `adlc` script; this
-explains the intent and the `ticket.md` shape.
+Store the run's ticket and get a **key**. A tracker is **one source, not a prerequisite** — Jira is
+optional and local files always work. This skill covers *where the ticket lives and how it's keyed*;
+the *requirement content* (Gherkin criteria, FRs, success criteria) is gathered by the stage-1
+source chain — a referenced item, Jira, or by interviewing the requester
+(`requirement-elicitation`) when nothing else supplies it. All mechanics are in the `adlc` script.
 
 ## Mode
 `adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
-`adlc set-state <KEY> jira_mode <mode>`.
+`adlc set-state <KEY> jira_mode <mode>`. No Jira is not a blocker — local mode is a first-class
+path, not a degraded one.
 
 ## Pick vs create
 If the user referenced a key, **pick** it; otherwise **create**.
@@ -21,6 +24,9 @@ If the user referenced a key, **pick** it; otherwise **create**.
     `Feature` + `Scenario` block into the description.
   - Then `adlc init "<request>" <KEY>` seeds the local run dir under that real key.
 - **Local mode:** `adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
+
+If the request is too thin to fill the criteria, **elicit first** (`requirement-elicitation`), then
+create/seed the ticket with the gathered content.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a

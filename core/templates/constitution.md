@@ -25,7 +25,11 @@ The project MUST <enforceable rule>. Rationale: <why>.
 - **Tech stack / versions:** <pinned languages, frameworks, tools — or "n/a">
 - **Coding standards:** <style, linters, naming — point to the config that enforces them>
 - **Security & data:** <secrets handling, PII rules, authz baseline>
-- **Testing:** <coverage floor, required test types, what "done" means>
+- **Quality gates (verify stage):** format, lint, static analysis, build, and tests must all pass.
+  These are stack-detected and run with the project's standard tools (see the `quality-gates` skill).
+- **Testing:** **coverage floor = 90%** (override per project; the verifier reads
+  `ADLC_MIN_COVERAGE` or this line). Required test types: <unit / integration / …>. "Done" =
+  every acceptance scenario has a passing test **and** the floor is met.
 
 ## Governance
 - This constitution supersedes ad-hoc preferences. Conflicts resolve in its favor.

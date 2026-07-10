@@ -31,23 +31,32 @@ Ensure `docs/adlc/constitution.md` exists: `adlc constitution` seeds it from the
 missing. Its principles are the standard the spec is checked against at Gate 1. If it's still a
 template stub, note that and proceed with defaults — don't block the run.
 
+## Requirement source (stage 1 is source-agnostic)
+A tracker is optional. Stage 1 gathers requirements from the first available source: a **referenced
+item** (Jira key / issue / doc) → **Jira** (if configured) → **interactive elicitation** (interview
+the requester) → stored in **local files**. No Jira is a first-class path, not a failure. When the
+request is thin and no source has the detail, intake **interviews the user** (`AskUserQuestion` on
+Claude) rather than emitting a blank ticket. Headless with no user → infer and mark every
+assumption `[NEEDS CLARIFICATION]`.
+
 ## Pipeline
 | Stage | Role | Do after it returns |
 |-------|------|---------------------|
-| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists; state → spec |
+| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists (from a tracker or by elicitation); state → spec |
 | 2 spec | `stages/2-spec.md` | persist `spec.md` (HOW) + Constitution Check; **run GATE 1** |
 | 3 tasks | `stages/3-tasks.md` | `tasks.md` from the approved spec; state → code |
 | 4 code | `stages/4-code.md` | code on the feature branch, per `tasks.md` |
 | 5 tests | `stages/5-tests.md` | tests written |
-| 6 verify | `stages/6-verify.md` | PASS → continue; FAIL → retry loop |
+| 6 verify | `stages/6-verify.md` | run the stack's quality gate (format/lint/static-analysis/build/tests+coverage≥floor); PASS → continue; FAIL → retry loop |
 | 7 ship | `stages/7-ship.md` | **run GATE 2 first**, then `adlc ship <KEY>` |
 
 After every stage, the role updates `current_stage`; append a line to the `## Log` in `state.md`.
 
 ## GATE 1 — approve the plan (after stage 2)
-Do not proceed to tasks/code until the user approves. Present the spec summary + the
-**Constitution Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or
-remaining `[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
+Do not proceed to tasks/code until the user approves. First run `adlc clarifications <KEY>` — if
+it lists anything, resolve those before approval. Present the spec summary + the **Constitution
+Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or remaining
+`[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
 - Approve → `adlc approve <KEY> gate1`, then continue to stage 3 (tasks).
 - Request changes → capture feedback, re-run stage 2, gate again.
 - Abort → set `current_stage` to `done`, log, stop.
@@ -89,13 +98,30 @@ Print a concise summary: KEY + title, branch, commit SHA, pushed?+compare URL, l
 
 Turn the request into a tracked ticket with a stable **KEY** and a complete **requirements spec —
 the WHAT and WHY**. This is the spec-kit *specify* step: describe the problem, not the solution.
-The technical design (the HOW) is stage 2 (`spec.md`) — write no design or code here. Works with
-or without a real Jira instance.
+The technical design (the HOW) is stage 2 (`spec.md`) — write no design or code here.
+
+**Requirements can come from anywhere.** A tracker is one source, not a prerequisite. Gather the
+detail from the best source available, and when none has it, **interview the requester** — never
+hand Gate 1 an empty or guessed ticket.
+
+## Source priority chain (use the first that applies)
+1. **Referenced item** — the user named a Jira key / issue / requirements doc → read it and use its
+   content as the starting point.
+2. **Jira** — configured (`adlc jira mode` = `jira`) and the user wants a new/picked issue →
+   create or pick it.
+3. **Interactive elicitation** — no usable source, or the request is a thin one-liner → gather the
+   requirements by interviewing the requester (see the `requirement-elicitation` skill).
+4. **Local file** — the store for everything above when Jira isn't in play; `adlc init` seeds it.
+
+Whatever the source, the *content* — stories, Gherkin scenarios, FRs, success criteria — is the
+same. The source only decides where the ticket is stored.
 
 ## Rules
 - All mechanical work goes through the `adlc` script — do not reimplement key generation,
-  state, or Jira calls by hand.
-- Jira vs local is automatic (`adlc jira mode`). Never echo secrets; creds come from env only.
+  state, or Jira calls by hand. Never echo secrets; creds come from env only.
+- **Elicit before guessing.** If you cannot write concrete Gherkin scenarios and functional
+  requirements from what you have, run the interview (`requirement-elicitation`) rather than
+  inventing them. If the request is already detailed, skip the interview.
 - **WHAT, not HOW.** No architecture, file names, or tech choices — those belong in `spec.md`.
 - **Acceptance criteria are written in Gherkin** — one `Feature` with 3–6 `Scenario`s in
   `Given/When/Then` form (see the `gherkin-criteria` skill). One concrete, observable behavior per
@@ -106,23 +132,29 @@ or without a real Jira instance.
   Surface these to the human — Gate 1 must not pass with any left unresolved.
 
 ## Workflow
-1. Detect mode: `adlc jira mode` → `jira` or `local`.
-2. Get a KEY + seed the run:
+1. **Pick the source** (chain above). Detect the tracker with `adlc jira mode` → `jira`/`local`.
+2. **Gather requirements:**
+   - Referenced item / Jira issue → read its detail.
+   - Otherwise, if the request is thin → **elicit** (interview via `AskUserQuestion` on Claude, a
+     short numbered list elsewhere; see `requirement-elicitation`). Headless/CI with no user →
+     infer and mark every assumption `[NEEDS CLARIFICATION]`; do not block.
+3. **Seed the run + KEY:**
    - **local:** `adlc init "<request>"` prints a new KEY (e.g. `ADLC-001`) and creates
      `docs/adlc/<KEY>/` with `state.md` + `ticket.md`.
-   - **jira:** create/pick the issue → `adlc jira create "<summary>" "<description>"` (prints the
-     KEY) or `adlc jira pick` (choose one), then `adlc init "<request>" <KEY>` to seed the
-     local run dir under the real key.
-3. Fill `docs/adlc/<KEY>/ticket.md`: Description, prioritized **User stories** (P1/P2/P3), the
-   Gherkin `Feature` block (happy path + ≥1 edge/error case), numbered **Functional requirements**,
-   measurable **Success criteria**, and **Edge cases**. In Jira mode, put the same content into the
-   issue description. Leave `[NEEDS CLARIFICATION]` markers wherever the request is underspecified.
-4. Record state: `adlc set-state <KEY> jira_mode <mode>` and
+   - **jira:** `adlc jira create "<summary>" "<description>"` (prints the KEY) or
+     `adlc jira pick`, then `adlc init "<request>" <KEY>` to seed the local run dir.
+4. **Fill** `docs/adlc/<KEY>/ticket.md` from the gathered requirements: Description, prioritized
+   **User stories** (P1/P2/P3), the Gherkin `Feature` block (happy path + ≥1 edge/error case),
+   numbered **Functional requirements**, measurable **Success criteria**, and **Edge cases**. In
+   Jira mode, mirror the same content into the issue description.
+5. **Check clarity:** `adlc clarifications <KEY>` lists any remaining `[NEEDS CLARIFICATION]`.
+6. Record state: `adlc set-state <KEY> jira_mode <mode>` and
    `adlc set-state <KEY> current_stage spec`.
 
 ## Output (hand back to the orchestrator)
-- The **KEY**, path to `ticket.md`, the **mode**, the Gherkin acceptance scenarios (by name), and
-  any **[NEEDS CLARIFICATION]** items the human must resolve.
+- The **KEY**, path to `ticket.md`, the **source** used (referenced / jira / elicited / local), the
+  Gherkin acceptance scenarios (by name), and any **[NEEDS CLARIFICATION]** items the human must
+  resolve.
 
 
 # Stage 2 — Technical plan / Spec  (→ GATE 1)
@@ -241,6 +273,11 @@ Write tests that prove the acceptance criteria hold.
   (`behave`, `pytest-bdd`, `cucumber`, `godog`, …), wire the scenarios to it directly; otherwise a
   plainly-named test per scenario is fine — do **not** introduce a new BDD dependency.
 - Write meaningful assertions (behavior, edge cases, error paths) — not `assert True`.
+- **Target the coverage floor** (default 90%, or the constitution's Testing floor / `ADLC_MIN_COVERAGE`)
+  from the start — stage 6 enforces it and will loop back here if it's short. Cover the changed code
+  paths, not just the happy line; the goal is real behavior coverage, not gaming the number.
+- Use the stack's standard coverage tool (JaCoCo, Jest/Vitest `--coverage`, `pytest --cov`,
+  `go test -cover`, …) — the same one stage 6 measures (see the `quality-gates` skill).
 - Don't modify product code to make tests pass; if a test reveals a bug, report it for stage 4.
   You may add small fixtures/helpers.
 
@@ -256,34 +293,46 @@ Write tests that prove the acceptance criteria hold.
   can only be verified manually, and why.
 
 
-# Stage 6 — Verify
+# Stage 6 — Verify  (the quality gate)
 
-Run the checks and report the truth. Never claim PASS without having actually run something and
-seen it succeed.
+Run the project's **standard quality gate** and report the truth. Verification is not just "tests
+pass" — it's "the change clears every gate the project holds itself to." Never claim PASS without
+having actually run each check and seen it succeed. Do not edit product code.
+
+## What to run (all gates; overall PASS only if each PASS) — see the `quality-gates` skill
+1. **Format** — the project's formatter in check mode (Spotless, Prettier, ktlint, black, gofmt, …).
+2. **Lint** — the linter is clean (Checkstyle, ESLint, ruff, golangci-lint, …).
+3. **Static analysis / automated code review** — bug/smell scanner (SpotBugs/PMD, detekt,
+   typescript-eslint, mypy/bandit, `go vet`, clippy, …).
+4. **Build / typecheck** — compiles / type-checks (`tsc --noEmit`, `mvn -q compile`, …).
+5. **Tests + coverage** — the suite passes **and line coverage ≥ threshold (default 90%)**.
 
 ## Rules
-- **Auto-detect** how the project verifies itself, in priority order:
-  1. A project-specific verify/run command if one exists — prefer it.
-  2. Test runner: `pytest`/`python -m pytest`, `npm|pnpm|yarn test`, `go test ./...`,
-     `cargo test`, `mvn test`, `make test`, …
-  3. Build/typecheck/lint if fast: `npm run build`, `tsc --noEmit`, `ruff`/`flake8`, …
-- Run the narrowest relevant checks first (the new tests), then a broader run if quick.
-- Report failures **verbatim** — copy the real error output into the report. If you cannot find
-  any way to run tests, say so explicitly (do NOT PASS). Do not edit product code.
+- **Detect, don't assume.** `adlc detect-stack` names the stack from marker files. This stage is
+  **project-independent** — the same logic works for Spring Boot, React, Vue, Android, Python, Go, …
+- **Prefer the project's own commands.** If it defines `package.json` scripts, a `Makefile`,
+  `pre-commit`, or a CI workflow, run those — mirror CI. Fall back to the stack's standard tools
+  (the `quality-gates` table) only when the project specifies nothing.
+- **Enforce coverage.** Threshold = `ADLC_MIN_COVERAGE` → else the constitution's Testing floor →
+  else 90. Read the real % from the coverage report. **Coverage that can't be measured is a FAIL**,
+  not a pass.
+- **Report failures verbatim** — copy real error output into the report. A missing tool is
+  **SKIPPED (tool absent)**, never a silent PASS.
 
 ## Workflow
-1. Read `spec.md` to know what "done" means and which tests matter.
-2. Detect the toolchain (look for `package.json`, `pyproject.toml`, `go.mod`, `Makefile`, …).
-3. Run the tests (and a quick build/lint if fast); capture stdout/stderr and exit codes.
-4. Write `docs/adlc/<KEY>/verification.md` (Result: PASS|FAIL, exact commands, output excerpts,
-   coverage as Scenario → passing test). Bump the attempt counter:
+1. Read `spec.md` (what "done" means) and `docs/adlc/constitution.md` (Testing floor / tool policy).
+2. `adlc detect-stack`; resolve the gate commands (project's own first, else standard defaults).
+3. Run the gates fast-first (new tests, then broader): format → lint → static analysis → build →
+   tests+coverage. Capture stdout/stderr, exit codes, and the coverage %.
+4. Write `docs/adlc/<KEY>/verification.md`: per-gate PASS/FAIL/SKIPPED, measured coverage vs
+   threshold, exact commands, output excerpts, and Scenario → passing test. Bump attempts:
    `adlc set-state <KEY> verify_attempts <n>`.
-5. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
-   orchestrator loops to stage 4.
+5. On overall PASS: `adlc set-state <KEY> current_stage ship`. On FAIL (a gate failed or coverage
+   < floor): leave stage at `verify`; the orchestrator loops to stage 4 (fix) / stage 5 (add tests).
 
 ## Output (hand back to the orchestrator)
-- **PASS** or **FAIL** (unambiguous); the exact commands run; on FAIL the specific failing
-  tests/errors so stage 4 can fix them.
+- **PASS** or **FAIL** (unambiguous); the detected stack; each gate's result and the **coverage % vs
+  floor**; the exact commands; on FAIL the specific failing gate/tests so stage 4/5 can fix them.
 
 
 # Stage 7 — Ship  (after GATE 2)
@@ -368,8 +417,10 @@ FAIL → bump `verify_attempts`, fix in stage 4, re-run tests + verify. After 3 
 surface the blocker to the human.
 
 ## Degradation
-No Jira creds → local tickets. No remote → local commit only. Always progress as far as possible
-rather than hard-failing.
+No requirement source (no Jira, no referenced item) → **interview the requester**
+(`requirement-elicitation`) and store locally; a tracker is optional, not required. No interactive
+user → infer requirements and mark assumptions `[NEEDS CLARIFICATION]`. No Jira creds → local
+tickets. No remote → local commit only. Always progress as far as possible rather than hard-failing.
 
 
 # constitution
@@ -411,13 +462,16 @@ the overall result, surfaced in the Gate 1 summary.
 
 # jira-ticket
 
-Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria written in
-Gherkin** (see the `gherkin-criteria` skill). All the mechanics are in the `adlc` script; this
-explains the intent and the `ticket.md` shape.
+Store the run's ticket and get a **key**. A tracker is **one source, not a prerequisite** — Jira is
+optional and local files always work. This skill covers *where the ticket lives and how it's keyed*;
+the *requirement content* (Gherkin criteria, FRs, success criteria) is gathered by the stage-1
+source chain — a referenced item, Jira, or by interviewing the requester
+(`requirement-elicitation`) when nothing else supplies it. All mechanics are in the `adlc` script.
 
 ## Mode
 `adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
-`adlc set-state <KEY> jira_mode <mode>`.
+`adlc set-state <KEY> jira_mode <mode>`. No Jira is not a blocker — local mode is a first-class
+path, not a degraded one.
 
 ## Pick vs create
 If the user referenced a key, **pick** it; otherwise **create**.
@@ -427,6 +481,9 @@ If the user referenced a key, **pick** it; otherwise **create**.
     `Feature` + `Scenario` block into the description.
   - Then `adlc init "<request>" <KEY>` seeds the local run dir under that real key.
 - **Local mode:** `adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
+
+If the request is too thin to fill the criteria, **elicit first** (`requirement-elicitation`), then
+create/seed the ticket with the gathered content.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a
@@ -442,6 +499,59 @@ Jira REST v3: `POST /rest/api/3/issue` (ADF description) to create, `GET /rest/a
 (JQL) to pick, HTTP Basic auth `JIRA_EMAIL:JIRA_API_TOKEN`. Implemented with the Python stdlib in
 `scripts/jira_ticket.py` (no pip installs). Run it with a real interpreter (`py` on Windows,
 `python3` on macOS/Linux) — the `adlc jira …` wrapper handles interpreter detection for you.
+
+
+# requirement-elicitation
+
+The universal fallback for requirement gathering. When there is **no Jira ticket, no issue, and no
+requirements doc** — or the request is a vague one-liner — don't just stamp out an empty template.
+**Interview the requester**, then write a complete `ticket.md`. This is spec-kit's *clarify* step,
+applied at intake.
+
+## When to elicit
+- The chosen source has no usable detail (local mode, or a tracker item that's just a title), **or**
+- the request is underspecified: you cannot write concrete Gherkin scenarios and functional
+  requirements from it without guessing.
+
+If the request is already detailed enough to write testable criteria, skip the interview — don't
+interrogate the user for its own sake.
+
+## What to ask (cover the gaps, in priority order)
+Ask about the dimensions you can't reasonably infer. Lead with the highest-leverage unknowns.
+1. **Problem & outcome** — what's broken/missing, and what does "done" look like for the user?
+2. **Users & context** — who uses this, and what's the current behavior?
+3. **Scope** — the must-haves for *this* change, and explicit **non-goals** / out-of-scope.
+4. **Acceptance behavior** — concrete examples of the happy path (these become Gherkin scenarios).
+5. **Edge cases & errors** — empty/invalid/unauthorized inputs, limits, concurrency, failure modes.
+6. **Constraints** — performance, security/data, compatibility, and any fixed tech choices.
+7. **Success criteria** — a measurable, technology-agnostic signal of success (feeds `SC-00N`).
+
+## How to ask (host-adaptive)
+- **Claude Code:** use `AskUserQuestion` — batch 2–4 crisp questions with sensible multiple-choice
+  options (always leaving room for a free-text answer). Prefer one well-chosen round; ask a second
+  round only if answers open a material new gap.
+- **Other interactive hosts:** ask a short **numbered list** of questions in one message; parse the
+  replies.
+- **Few and sharp.** 3–6 questions total. Offer a recommended default per question so the user can
+  accept fast. Never block on trivia you can decide yourself — decide it and note the assumption.
+
+## Converge
+1. Restate the requirements you now hold as a short **assumptions** summary ("Here's what I'll build
+   unless you correct me").
+2. Turn the answers into the ticket sections: user stories, the Gherkin `Feature`, functional
+   requirements (`FR-00N`), success criteria (`SC-00N`), edge cases.
+3. Mark anything still open with `[NEEDS CLARIFICATION: <question>]` — always include the question
+   **after the colon** (that colon form is what `adlc clarifications <KEY>` detects; the bare
+   `[NEEDS CLARIFICATION]` in template prose is ignored). Gate 1 must have none left.
+
+## Degradation (non-interactive / headless / CI)
+No user to interview? Do **not** hard-fail. Infer the most reasonable requirements from the request,
+write them, and mark **every** inferred decision with `[NEEDS CLARIFICATION]` so the human resolves
+them at Gate 1. Surface the list explicitly in the intake output.
+
+## Output
+A completed `ticket.md` (or Jira/issue description) plus the list of any remaining
+`[NEEDS CLARIFICATION]` items to carry into the Gate 1 review.
 
 
 # spec-design
@@ -574,3 +684,63 @@ Turn the approved `spec.md` into an executable checklist that drives implementat
 
 ## Output
 Return the path to `tasks.md`, the task count, the `[P]` groups, and any coverage gap/blocker.
+
+
+# quality-gates
+
+Verification is not "did the tests pass" — it's **did the change clear the project's standard
+quality bar**. This gate is **project-independent**: it reads the project, detects the stack, and
+runs the *recognized standard tools* for that stack. Nothing is hardcoded to one language.
+
+## The gates (run all; overall PASS only if each PASS)
+1. **Format** — the code matches the project's formatter (check mode, no writes).
+2. **Lint** — style/correctness linter is clean.
+3. **Static analysis / automated code review** — bug-pattern / smell scanner is clean.
+4. **Build / typecheck** — compiles / type-checks.
+5. **Tests + coverage** — the suite passes **and line coverage ≥ threshold** (default **90%**).
+
+## How to run it
+1. **Detect the stack** — `adlc detect-stack` prints the detected stack(s) from marker files
+   (`pom.xml`, `build.gradle`, `package.json`, `go.mod`, `pyproject.toml`, …).
+2. **Prefer the project's own commands.** If the project already defines them, use those — they are
+   the source of truth:
+   - `package.json` scripts (`lint`, `format:check`, `test:coverage`), a `Makefile` (`make lint
+     test`), `pre-commit`, or a CI workflow. Mirror what CI runs.
+3. **Otherwise fall back to the stack's standard tools** (table below).
+4. **Enforce coverage** ≥ the threshold (`ADLC_MIN_COVERAGE`, else the constitution's Testing floor,
+   else 90). Read the actual % from the coverage report; a run with no coverage measurement is a
+   FAIL, not a pass.
+5. Record each gate's result + the coverage number in `verification.md`.
+
+## Standard tools by stack (fallback defaults)
+| Stack (detected by) | Format | Lint | Static analysis | Tests + coverage (≥ threshold) |
+|---------------------|--------|------|-----------------|-------------------------------|
+| **Java / Spring Boot — Maven** (`pom.xml`) | `mvn spotless:check` | `mvn checkstyle:check` | `mvn spotbugs:check` / PMD | `mvn verify` + **JaCoCo** (`jacoco:check` rule) |
+| **Java/Kotlin — Gradle** (`build.gradle[.kts]`) | `./gradlew spotlessCheck` | `./gradlew checkstyleMain` / `ktlintCheck` | `./gradlew spotbugsMain` / `detekt` | `./gradlew test jacocoTestCoverageVerification` |
+| **Android** (`build.gradle` + `AndroidManifest.xml`) | `./gradlew spotlessCheck` / `ktlintCheck` | `./gradlew lint` (Android Lint) | `detekt` | `./gradlew testDebugUnitTest` + **JaCoCo** report |
+| **React / Node (JS/TS)** (`package.json` + `react`) | `npx prettier --check .` | `npx eslint .` | `eslint` (typescript-eslint) / `tsc --noEmit` | `npm test -- --coverage` (**Jest/Vitest** `coverageThreshold`) |
+| **Vue** (`package.json` + `vue`) | `npx prettier --check .` | `npx eslint .` (eslint-plugin-vue) | `vue-tsc --noEmit` | `vitest run --coverage` |
+| **Angular** (`angular.json`) | `npx prettier --check .` | `ng lint` | `tsc --noEmit` | `ng test --code-coverage --watch=false` |
+| **Python** (`pyproject.toml`/`setup.py`) | `black --check .` / `ruff format --check` | `ruff check .` / `flake8` | `mypy` / `bandit` | `pytest --cov --cov-fail-under=<threshold>` |
+| **Go** (`go.mod`) | `gofmt -l .` | `golangci-lint run` | `go vet ./...` | `go test -cover ./...` (parse coverage) |
+| **Rust** (`Cargo.toml`) | `cargo fmt --check` | `cargo clippy -- -D warnings` | `clippy` | `cargo test` + `cargo llvm-cov` |
+| **.NET** (`*.csproj`/`*.sln`) | `dotnet format --verify-no-changes` | analyzers | Roslyn analyzers | `dotnet test /p:CollectCoverage=true` (**Coverlet**) |
+| **Ruby** (`Gemfile`) | `rubocop` | `rubocop` | `brakeman` | `rspec` + **SimpleCov** |
+
+> Tools optional per project. Prefer whatever the project actually has configured; the table is the
+> default only when the project specifies nothing.
+
+## Enforcement & the retry loop
+- Coverage below the floor, or any gate failing, makes stage 6 **FAIL** → the orchestrator loops
+  back to stage 4 (fix) / stage 5 (add tests). Stage 5 should target the floor from the start.
+- Thresholds and any tool skips are **governed by the constitution** (Testing section) — keep the
+  floor there so it's a project decision, not a hidden default.
+
+## Degradation (be honest — never silently pass)
+- A required tool isn't installed → report it as **SKIPPED (tool absent)** in `verification.md` and
+  do **not** count it as PASS; if coverage can't be measured at all, the result is FAIL.
+- No test framework found → FAIL with "no way to measure coverage", not a green check.
+
+## Output
+Per-gate PASS/FAIL/SKIPPED, the measured **coverage %** vs the threshold, exact commands run, and
+verbatim failures — written to `verification.md`.

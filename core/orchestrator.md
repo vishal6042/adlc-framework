@@ -31,23 +31,32 @@ Ensure `docs/adlc/constitution.md` exists: `@ADLC@ constitution` seeds it from t
 missing. Its principles are the standard the spec is checked against at Gate 1. If it's still a
 template stub, note that and proceed with defaults — don't block the run.
 
+## Requirement source (stage 1 is source-agnostic)
+A tracker is optional. Stage 1 gathers requirements from the first available source: a **referenced
+item** (Jira key / issue / doc) → **Jira** (if configured) → **interactive elicitation** (interview
+the requester) → stored in **local files**. No Jira is a first-class path, not a failure. When the
+request is thin and no source has the detail, intake **interviews the user** (`AskUserQuestion` on
+Claude) rather than emitting a blank ticket. Headless with no user → infer and mark every
+assumption `[NEEDS CLARIFICATION]`.
+
 ## Pipeline
 | Stage | Role | Do after it returns |
 |-------|------|---------------------|
-| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists; state → spec |
+| 1 intake | `stages/1-intake.md` | requirements ticket (WHAT) exists (from a tracker or by elicitation); state → spec |
 | 2 spec | `stages/2-spec.md` | persist `spec.md` (HOW) + Constitution Check; **run GATE 1** |
 | 3 tasks | `stages/3-tasks.md` | `tasks.md` from the approved spec; state → code |
 | 4 code | `stages/4-code.md` | code on the feature branch, per `tasks.md` |
 | 5 tests | `stages/5-tests.md` | tests written |
-| 6 verify | `stages/6-verify.md` | PASS → continue; FAIL → retry loop |
+| 6 verify | `stages/6-verify.md` | run the stack's quality gate (format/lint/static-analysis/build/tests+coverage≥floor); PASS → continue; FAIL → retry loop |
 | 7 ship | `stages/7-ship.md` | **run GATE 2 first**, then `@ADLC@ ship <KEY>` |
 
 After every stage, the role updates `current_stage`; append a line to the `## Log` in `state.md`.
 
 ## GATE 1 — approve the plan (after stage 2)
-Do not proceed to tasks/code until the user approves. Present the spec summary + the
-**Constitution Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or
-remaining `[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
+Do not proceed to tasks/code until the user approves. First run `@ADLC@ clarifications <KEY>` — if
+it lists anything, resolve those before approval. Present the spec summary + the **Constitution
+Check result** + the path `docs/adlc/<KEY>/spec.md` + any open questions or remaining
+`[NEEDS CLARIFICATION]`, and ask: **Approve / Request changes / Abort**.
 - Approve → `@ADLC@ approve <KEY> gate1`, then continue to stage 3 (tasks).
 - Request changes → capture feedback, re-run stage 2, gate again.
 - Abort → set `current_stage` to `done`, log, stop.

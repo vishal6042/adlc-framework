@@ -7,6 +7,9 @@
 # Usage:
 #   adlc init "<request>" [KEY]     create docs/adlc/<KEY>/ + state.md (+ local ticket)
 #   adlc constitution               create/print docs/adlc/constitution.md (project principles)
+#   adlc clarifications <KEY>       list unresolved [NEEDS CLARIFICATION] markers (nonzero if any)
+#   adlc detect-stack               print the project's detected stack(s) for the quality gate
+#   adlc min-coverage               print the resolved coverage floor (ADLC_MIN_COVERAGE or 90)
 #   adlc next-key                   print the next local ticket key (ADLC-00N)
 #   adlc status <KEY>               print the state file
 #   adlc get-state <KEY> <field>    read one state field
@@ -87,6 +90,24 @@ case "$cmd" in
     fi
     echo "$cfile"
     ;;
+
+  clarifications) # list unresolved [NEEDS CLARIFICATION: ...] markers for a KEY; exit 1 if any remain
+    # A real marker always carries the question after a colon; the bare form in template prose
+    # (e.g. "mark unknowns with [NEEDS CLARIFICATION]") is guidance, not an open item, so it's ignored.
+    key="${1:?KEY required}"; d="$(key_dir "$key")"
+    found=0
+    for f in "$d/ticket.md" "$d/spec.md" "$d/tasks.md"; do
+      [ -f "$f" ] || continue
+      while IFS= read -r line; do
+        found=1; echo "$line"
+      done < <(grep -nE "\[NEEDS CLARIFICATION:" "$f" | sed "s|^|$f:|")
+    done
+    if [ "$found" = "1" ]; then exit 1; fi
+    echo "no open clarifications for $key"
+    ;;
+
+  detect-stack) detect_stack ;;
+  min-coverage) min_coverage ;;
 
   status)      key="${1:?KEY required}"; cat "$(state_file "$key")" ;;
   get-state)   get_state "${1:?KEY}" "${2:?field}" ;;
