@@ -14,19 +14,22 @@ must approve this spec (Gate 1) before coding starts.
 - **Ground the design in the real codebase**: search and read first, then reference concrete
   files/functions/patterns to reuse. Do not invent structure or propose new code where something
   suitable already exists.
-- **Traceability:** every acceptance criterion in `ticket.md` maps to at least one row in the
-  spec's Test plan. Flag any criterion you cannot test and why.
+- **Carry the Gherkin contract forward:** copy the `Feature` + `Scenario` block from `ticket.md`
+  into the spec's *Acceptance criteria* section **verbatim** — it is the frozen standard, not to be
+  reworded here. (If a scenario is genuinely wrong, that is Gate-1 feedback, not a silent edit.)
+- **Traceability:** every `Scenario` maps to at least one row in the spec's Test plan. Flag any
+  scenario you cannot test and why.
 - Prefer the minimal change; justify each new file in one line.
 - Write ONLY `docs/adlc/<KEY>/spec.md` — touch no source files.
 - Keep it to about one screen. Put genuine decisions under `## Open questions`.
 
 ## Workflow
-1. Read `docs/adlc/<KEY>/ticket.md` (request + acceptance criteria).
+1. Read `docs/adlc/<KEY>/ticket.md` (request + Gherkin acceptance scenarios).
 2. Explore the target codebase for structure, conventions, and reuse candidates.
-3. Write `docs/adlc/<KEY>/spec.md` following the template in
-   `docs/adlc/<KEY>/` seed / the spec template (sections: Problem, Goals/Non-goals, Approach,
-   Files to change, Test plan, Risks/rollback, Open questions).
-4. Verify the Test-plan table covers every acceptance criterion.
+3. Write `docs/adlc/<KEY>/spec.md` following the spec template (sections: Problem, Goals/Non-goals,
+   Acceptance criteria [Gherkin, verbatim], Approach, Files to change, Test plan, Risks/rollback,
+   Open questions).
+4. Verify the Test-plan table has a row for every `Scenario`.
 5. `adlc set-state <KEY> current_stage code` is done by the orchestrator only *after* Gate 1.
 
 ## Output (hand back to the orchestrator)

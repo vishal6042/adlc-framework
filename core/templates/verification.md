@@ -7,6 +7,6 @@
 ## Output
 <key excerpts of the actual test/build output, especially failures>
 
-## Coverage vs acceptance criteria
-- <criterion> → <passing test> ✅
-- <criterion> → ❌ <why>
+## Coverage vs acceptance criteria (Gherkin scenarios)
+- <scenario name> → <passing test> ✅
+- <scenario name> → ❌ <why>

@@ -8,10 +8,22 @@
 ## Description
 <TITLE>
 
-## Acceptance criteria
-- [ ] <criterion 1 — specific and testable>
-- [ ] <criterion 2>
-- [ ] <criterion 3>
+## Acceptance criteria (Gherkin)
+```gherkin
+Feature: <short feature name>
+  <one-line description of the capability and who it is for>
+
+  Scenario: <criterion 1 — one concrete, observable behavior>
+    Given <initial context / preconditions>
+    When  <the action or event>
+    Then  <the expected, checkable outcome>
+
+  Scenario: <criterion 2 — e.g. the primary error / edge case>
+    Given <context>
+    When  <action>
+    Then  <outcome>
+```
+> One `Scenario` per criterion; declarative steps; observable `Then`. See the `gherkin-criteria` skill.
 
 ## Notes
 <links, constraints, out-of-scope>

@@ -92,8 +92,10 @@ criteria**. Works with or without a real Jira instance.
   state, or Jira calls by hand.
 - Jira vs local is automatic (`adlc jira mode`). Never echo secrets; creds come from env only.
 - Do NOT design or write code here. Stop once the ticket exists.
-- Acceptance criteria must be specific and testable. If the request is ambiguous, write the most
-  reasonable criteria and note the ambiguity under `## Notes`.
+- **Acceptance criteria are written in Gherkin** — one `Feature` with 3–6 `Scenario`s in
+  `Given/When/Then` form (see the `gherkin-criteria` skill). Each scenario is one concrete,
+  observable behavior; include at least one error/edge scenario, not just the happy path. If the
+  request is ambiguous, write the most reasonable scenarios and note the ambiguity under `## Notes`.
 
 ## Workflow
 1. Detect mode: `adlc jira mode` → `jira` or `local`.
@@ -103,12 +105,14 @@ criteria**. Works with or without a real Jira instance.
    - **jira:** create/pick the issue → `adlc jira create "<summary>" "<description>"` (prints the
      KEY) or `adlc jira pick` (choose one), then `adlc init "<request>" <KEY>` to seed the
      local run dir under the real key.
-3. Edit `docs/adlc/<KEY>/ticket.md`: fill the Description and 3–6 acceptance criteria.
+3. Edit `docs/adlc/<KEY>/ticket.md`: fill the Description and the Gherkin `Feature` block with
+   3–6 `Scenario`s (happy path + at least one edge/error case). In Jira mode, put the same Gherkin
+   block into the issue description.
 4. Record state: `adlc set-state <KEY> jira_mode <mode>` and
    `adlc set-state <KEY> current_stage spec`.
 
 ## Output (hand back to the orchestrator)
-- The **KEY**, path to `ticket.md`, the **mode**, and the acceptance-criteria list.
+- The **KEY**, path to `ticket.md`, the **mode**, and the Gherkin acceptance scenarios (by name).
 
 
 # Stage 2 — Design / Spec  (→ GATE 1)
@@ -120,19 +124,22 @@ must approve this spec (Gate 1) before coding starts.
 - **Ground the design in the real codebase**: search and read first, then reference concrete
   files/functions/patterns to reuse. Do not invent structure or propose new code where something
   suitable already exists.
-- **Traceability:** every acceptance criterion in `ticket.md` maps to at least one row in the
-  spec's Test plan. Flag any criterion you cannot test and why.
+- **Carry the Gherkin contract forward:** copy the `Feature` + `Scenario` block from `ticket.md`
+  into the spec's *Acceptance criteria* section **verbatim** — it is the frozen standard, not to be
+  reworded here. (If a scenario is genuinely wrong, that is Gate-1 feedback, not a silent edit.)
+- **Traceability:** every `Scenario` maps to at least one row in the spec's Test plan. Flag any
+  scenario you cannot test and why.
 - Prefer the minimal change; justify each new file in one line.
 - Write ONLY `docs/adlc/<KEY>/spec.md` — touch no source files.
 - Keep it to about one screen. Put genuine decisions under `## Open questions`.
 
 ## Workflow
-1. Read `docs/adlc/<KEY>/ticket.md` (request + acceptance criteria).
+1. Read `docs/adlc/<KEY>/ticket.md` (request + Gherkin acceptance scenarios).
 2. Explore the target codebase for structure, conventions, and reuse candidates.
-3. Write `docs/adlc/<KEY>/spec.md` following the template in
-   `docs/adlc/<KEY>/` seed / the spec template (sections: Problem, Goals/Non-goals, Approach,
-   Files to change, Test plan, Risks/rollback, Open questions).
-4. Verify the Test-plan table covers every acceptance criterion.
+3. Write `docs/adlc/<KEY>/spec.md` following the spec template (sections: Problem, Goals/Non-goals,
+   Acceptance criteria [Gherkin, verbatim], Approach, Files to change, Test plan, Risks/rollback,
+   Open questions).
+4. Verify the Test-plan table has a row for every `Scenario`.
 5. `adlc set-state <KEY> current_stage code` is done by the orchestrator only *after* Gate 1.
 
 ## Output (hand back to the orchestrator)
@@ -175,24 +182,26 @@ Write the code for an already-approved spec.
 Write tests that prove the acceptance criteria hold.
 
 ## Rules
-- Cover the **Test plan** in `docs/adlc/<KEY>/spec.md`; every acceptance criterion gets at least
-  one test.
+- Cover the **Test plan** in `docs/adlc/<KEY>/spec.md`; every Gherkin `Scenario` gets at least
+  one test. Name each test after its scenario so the mapping is obvious.
 - Use the project's **existing** test framework and layout — detect it, don't impose a new one
   (`pytest`/`tests/`, `jest`/`vitest`/`*.test.*`, `go test`, `cargo test`, JUnit, …). Match the
-  file locations and naming already present.
+  file locations and naming already present. If the project already uses a BDD runner
+  (`behave`, `pytest-bdd`, `cucumber`, `godog`, …), wire the scenarios to it directly; otherwise a
+  plainly-named test per scenario is fine — do **not** introduce a new BDD dependency.
 - Write meaningful assertions (behavior, edge cases, error paths) — not `assert True`.
 - Don't modify product code to make tests pass; if a test reveals a bug, report it for stage 3.
   You may add small fixtures/helpers.
 
 ## Workflow
-1. Read `spec.md` (Test plan) and `ticket.md` (acceptance criteria).
+1. Read `spec.md` (Test plan + Gherkin scenarios) and `ticket.md` (acceptance criteria).
 2. Detect the framework and existing conventions (search config + sample tests).
 3. Write tests in the right location with matching style.
 4. Optionally do a quick syntax/collection check of just the new tests.
 5. `adlc set-state <KEY> current_stage verify`.
 
 ## Output (hand back to the orchestrator)
-- Test files created/modified; a criterion → test mapping (show full coverage); any criterion that
+- Test files created/modified; a scenario → test mapping (show full coverage); any scenario that
   can only be verified manually, and why.
 
 
@@ -216,7 +225,7 @@ seen it succeed.
 2. Detect the toolchain (look for `package.json`, `pyproject.toml`, `go.mod`, `Makefile`, …).
 3. Run the tests (and a quick build/lint if fast); capture stdout/stderr and exit codes.
 4. Write `docs/adlc/<KEY>/verification.md` (Result: PASS|FAIL, exact commands, output excerpts,
-   coverage-vs-criteria). Bump the attempt counter:
+   coverage as Scenario → passing test). Bump the attempt counter:
    `adlc set-state <KEY> verify_attempts <n>`.
 5. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
    orchestrator loops to stage 3.
@@ -276,7 +285,7 @@ docs/adlc/tickets/<KEY>.md   # local-mode ticket mirror
 
 | Stage | Advances when |
 |-------|---------------|
-| intake | `ticket.md` has acceptance criteria |
+| intake | `ticket.md` has Gherkin acceptance scenarios |
 | spec | `spec.md` written → Gate 1 |
 | code | change implemented on the feature branch |
 | tests | tests written per the spec Test plan |
@@ -309,8 +318,9 @@ rather than hard-failing.
 
 # jira-ticket
 
-Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria**. All the
-mechanics are in the `adlc` script; this explains the intent and the `ticket.md` shape.
+Turn a request into a tracked ticket with a **key** and explicit **acceptance criteria written in
+Gherkin** (see the `gherkin-criteria` skill). All the mechanics are in the `adlc` script; this
+explains the intent and the `ticket.md` shape.
 
 ## Mode
 `adlc jira mode` → `jira` (all three `JIRA_*` vars set) or `local`. Record it with
@@ -320,18 +330,19 @@ mechanics are in the `adlc` script; this explains the intent and the `ticket.md`
 If the user referenced a key, **pick** it; otherwise **create**.
 - **Jira mode:**
   - pick: `adlc jira pick` lists open issues (`KEY  status  summary`); choose one.
-  - create: `adlc jira create "<summary>" "<description>"` prints the new KEY. Put acceptance
-    criteria into the description (one bullet per criterion).
+  - create: `adlc jira create "<summary>" "<description>"` prints the new KEY. Put the Gherkin
+    `Feature` + `Scenario` block into the description.
   - Then `adlc init "<request>" <KEY>` seeds the local run dir under that real key.
 - **Local mode:** `adlc init "<request>"` generates the next `ADLC-00N` key and seeds everything.
 
 ## ticket.md shape (both modes)
 Sections: title line `# <KEY>: <summary>`, a metadata block (Status/Type/Mode/Created), a
-**Description**, an **Acceptance criteria** checklist (specific + testable), and **Notes**. The
-`init` command writes a stub from the template; fill in the real content.
+**Description**, an **Acceptance criteria (Gherkin)** block — one `Feature` with `Scenario`s in
+`Given/When/Then` form — and **Notes**. The `init` command writes a stub from the template; fill in
+the real content.
 
 ## Output
-Return the **key**, path to `ticket.md`, the **mode**, and the acceptance-criteria list.
+Return the **key**, path to `ticket.md`, the **mode**, and the Gherkin acceptance scenarios.
 
 ## Under the hood (for reference / non-adlc hosts)
 Jira REST v3: `POST /rest/api/3/issue` (ADF description) to create, `GET /rest/api/3/search`
@@ -347,24 +358,92 @@ Produce a concise, reviewable design doc — complete enough to approve, short e
 ## Rules
 1. **Ground it in the real codebase.** Read the relevant files first; name actual files,
    functions, and patterns to reuse. Don't invent structure.
-2. **Traceability:** every acceptance criterion in `ticket.md` maps to at least one Test-plan row.
-   Call out any criterion you cannot test and why.
-3. **Minimal surface:** prefer extending existing code; justify each new file in one line.
-4. **No code yet** — describe the change; small signatures/snippets are fine.
-5. **Be honest about risk** — what could break, and how to roll back.
-6. Keep it to ~one screen.
+2. **Gherkin contract:** copy the `Feature` + `Scenario` block from `ticket.md` into the spec
+   verbatim (the `gherkin-criteria` skill defines the format); it is the frozen standard.
+3. **Traceability:** every `Scenario` maps to at least one Test-plan row. Call out any scenario you
+   cannot test and why.
+4. **Minimal surface:** prefer extending existing code; justify each new file in one line.
+5. **No code yet** — describe the change; small signatures/snippets are fine.
+6. **Be honest about risk** — what could break, and how to roll back.
+7. Keep it to ~one screen.
 
 ## Sections (write to `docs/adlc/<KEY>/spec.md`)
 1. **Problem & context** — what's asked and why; current behavior.
-2. **Goals / non-goals** — goals tied to acceptance criteria; explicit out-of-scope.
-3. **Proposed approach** — the design in prose, referencing concrete files/functions; note key
+2. **Goals / non-goals** — goals tied to the acceptance scenarios; explicit out-of-scope.
+3. **Acceptance criteria (Gherkin)** — the `Feature` + `Scenario` block, copied verbatim from the
+   ticket; the frozen contract.
+4. **Proposed approach** — the design in prose, referencing concrete files/functions; note key
    decisions and rejected alternatives in one line each.
-4. **Files to change** — a table of file → change (mark new files).
-5. **Test plan** — a table mapping each acceptance criterion → test → type (unit/integration/manual).
-6. **Risks & rollback** — risks → mitigations; rollback = revert the branch.
-7. **Open questions** — anything needing a human decision at Gate 1 (empty if none).
+5. **Files to change** — a table of file → change (mark new files).
+6. **Test plan** — a table mapping each `Scenario` → test → type (unit/integration/manual).
+7. **Risks & rollback** — risks → mitigations; rollback = revert the branch.
+8. **Open questions** — anything needing a human decision at Gate 1 (empty if none).
 
 A template with these sections is seeded at `docs/adlc/<KEY>/` by the framework; fill it in.
 
 ## Output
 Return the path to `spec.md` and a 2–3 sentence approach summary for the Gate 1 prompt.
+
+
+# gherkin-criteria
+
+The ADLC standard for acceptance criteria is **Gherkin**, the plain-language BDD
+notation. Every criterion is a `Scenario` under one `Feature`, described only in terms of
+observable behavior (`Given` context → `When` action → `Then` outcome). This makes each
+criterion unambiguous, independently testable, and traceable one-to-one into the spec's Test
+plan and into stage-4 tests.
+
+## The grammar (keep to this exact subset)
+```gherkin
+Feature: <short feature name>
+  <one-line description of the capability and who it is for>
+
+  Background:            # optional — Given steps shared by every scenario
+    Given <shared precondition>
+
+  Scenario: <one concrete behavior, phrased as an outcome>
+    Given <initial context / preconditions>
+    When  <the action or event that triggers the behavior>
+    Then  <the single, observable expected outcome>
+    And   <a further outcome, if needed>
+
+  Scenario Outline: <behavior that varies by data>   # optional
+    Given <context with a <placeholder>>
+    When  <action with a <placeholder>>
+    Then  <outcome with a <placeholder>>
+    Examples:
+      | placeholder | outcome |
+      | value-1     | ...     |
+      | value-2     | ...     |
+```
+
+Keywords: `Feature`, `Background`, `Scenario`, `Scenario Outline` / `Examples`, and the steps
+`Given` / `When` / `Then` / `And` / `But`. Nothing else.
+
+## Rules for good scenarios
+1. **One behavior per scenario.** If a scenario needs two unrelated `When`s, split it.
+2. **Declarative, not imperative.** Describe *what* the system does, not UI click-by-click steps
+   (`When the user submits an invalid email`, not `When the user types … and clicks the button`).
+3. **Observable outcomes only.** Every `Then` must be checkable from outside the system —
+   a response, a value, a stored record, a raised error. No "Then it works".
+4. **Concrete, not vague.** Prefer real values (`Then the response status is 200 and body is
+   {"status":"ok"}`) over adjectives ("Then it responds correctly").
+5. **Cover the unhappy paths.** Include at least the primary error/edge scenario, not only the
+   happy path.
+6. **Independent scenarios.** Each stands alone; don't rely on a previous scenario's side effects
+   (use `Background` for shared setup instead).
+7. **3–6 scenarios** for a typical ticket. If you need many more, the ticket is too big — note it.
+
+## How it flows through the pipeline
+- **Stage 1 (intake):** write the `Feature` + scenarios into `ticket.md` under *Acceptance criteria*.
+- **Stage 2 (spec):** copy the same `Feature` block into `spec.md` verbatim (the standard,
+  frozen contract), then map **each Scenario → at least one Test-plan row**.
+- **Stage 4 (tests):** implement one test per scenario (BDD runner if the project already uses one
+  — `behave`, `pytest-bdd`, `cucumber`, `godog`, …; otherwise a plainly-named test per scenario).
+- **Stage 5 (verify):** report coverage as *Scenario → passing test*.
+
+Traceability rule: a Scenario with no test is a gap; a test with no Scenario is scope creep.
+
+## Output
+The `Feature` block (valid Gherkin) plus a one-line note on any scenario that can only be
+verified manually and why.

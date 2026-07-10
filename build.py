@@ -26,7 +26,7 @@ ADLC_CLAUDE = "adlc"
 ADLC_PATH = "adlc"  # on PATH via ADLC_HOME
 
 STAGE_ORDER = ["1-intake", "2-spec", "3-code", "4-tests", "5-verify", "6-ship"]
-SKILLS = ["adlc-workflow", "jira-ticket", "spec-design"]
+SKILLS = ["adlc-workflow", "jira-ticket", "spec-design", "gherkin-criteria"]
 
 
 # --- tiny frontmatter parser ----------------------------------------------

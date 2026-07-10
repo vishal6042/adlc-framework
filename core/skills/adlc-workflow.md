@@ -21,7 +21,7 @@ docs/adlc/tickets/<KEY>.md   # local-mode ticket mirror
 
 | Stage | Advances when |
 |-------|---------------|
-| intake | `ticket.md` has acceptance criteria |
+| intake | `ticket.md` has Gherkin acceptance scenarios |
 | spec | `spec.md` written → Gate 1 |
 | code | change implemented on the feature branch |
 | tests | tests written per the spec Test plan |

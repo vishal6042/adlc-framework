@@ -24,7 +24,7 @@ seen it succeed.
 2. Detect the toolchain (look for `package.json`, `pyproject.toml`, `go.mod`, `Makefile`, …).
 3. Run the tests (and a quick build/lint if fast); capture stdout/stderr and exit codes.
 4. Write `docs/adlc/<KEY>/verification.md` (Result: PASS|FAIL, exact commands, output excerpts,
-   coverage-vs-criteria). Bump the attempt counter:
+   coverage as Scenario → passing test). Bump the attempt counter:
    `@ADLC@ set-state <KEY> verify_attempts <n>`.
 5. On PASS: `@ADLC@ set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
    orchestrator loops to stage 3.

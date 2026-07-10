@@ -15,8 +15,10 @@ criteria**. Works with or without a real Jira instance.
   state, or Jira calls by hand.
 - Jira vs local is automatic (`adlc jira mode`). Never echo secrets; creds come from env only.
 - Do NOT design or write code here. Stop once the ticket exists.
-- Acceptance criteria must be specific and testable. If the request is ambiguous, write the most
-  reasonable criteria and note the ambiguity under `## Notes`.
+- **Acceptance criteria are written in Gherkin** — one `Feature` with 3–6 `Scenario`s in
+  `Given/When/Then` form (see the `gherkin-criteria` skill). Each scenario is one concrete,
+  observable behavior; include at least one error/edge scenario, not just the happy path. If the
+  request is ambiguous, write the most reasonable scenarios and note the ambiguity under `## Notes`.
 
 ## Workflow
 1. Detect mode: `adlc jira mode` → `jira` or `local`.
@@ -26,9 +28,11 @@ criteria**. Works with or without a real Jira instance.
    - **jira:** create/pick the issue → `adlc jira create "<summary>" "<description>"` (prints the
      KEY) or `adlc jira pick` (choose one), then `adlc init "<request>" <KEY>` to seed the
      local run dir under the real key.
-3. Edit `docs/adlc/<KEY>/ticket.md`: fill the Description and 3–6 acceptance criteria.
+3. Edit `docs/adlc/<KEY>/ticket.md`: fill the Description and the Gherkin `Feature` block with
+   3–6 `Scenario`s (happy path + at least one edge/error case). In Jira mode, put the same Gherkin
+   block into the issue description.
 4. Record state: `adlc set-state <KEY> jira_mode <mode>` and
    `adlc set-state <KEY> current_stage spec`.
 
 ## Output (hand back to the orchestrator)
-- The **KEY**, path to `ticket.md`, the **mode**, and the acceptance-criteria list.
+- The **KEY**, path to `ticket.md`, the **mode**, and the Gherkin acceptance scenarios (by name).
