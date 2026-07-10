@@ -47,7 +47,7 @@ assumption `[NEEDS CLARIFICATION]`.
 | 3 tasks | `stages/3-tasks.md` | `tasks.md` from the approved spec; state → code |
 | 4 code | `stages/4-code.md` | code on the feature branch, per `tasks.md` |
 | 5 tests | `stages/5-tests.md` | tests written |
-| 6 verify | `stages/6-verify.md` | PASS → continue; FAIL → retry loop |
+| 6 verify | `stages/6-verify.md` | run the stack's quality gate (format/lint/static-analysis/build/tests+coverage≥floor); PASS → continue; FAIL → retry loop |
 | 7 ship | `stages/7-ship.md` | **run GATE 2 first**, then `@ADLC@ ship <KEY>` |
 
 After every stage, the role updates `current_stage`; append a line to the `## Log` in `state.md`.

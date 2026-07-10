@@ -18,6 +18,11 @@ Write tests that prove the acceptance criteria hold.
   (`behave`, `pytest-bdd`, `cucumber`, `godog`, …), wire the scenarios to it directly; otherwise a
   plainly-named test per scenario is fine — do **not** introduce a new BDD dependency.
 - Write meaningful assertions (behavior, edge cases, error paths) — not `assert True`.
+- **Target the coverage floor** (default 90%, or the constitution's Testing floor / `ADLC_MIN_COVERAGE`)
+  from the start — stage 6 enforces it and will loop back here if it's short. Cover the changed code
+  paths, not just the happy line; the goal is real behavior coverage, not gaming the number.
+- Use the stack's standard coverage tool (JaCoCo, Jest/Vitest `--coverage`, `pytest --cov`,
+  `go test -cover`, …) — the same one stage 6 measures (see the `quality-gates` skill).
 - Don't modify product code to make tests pass; if a test reveals a bug, report it for stage 4.
   You may add small fixtures/helpers.
 
