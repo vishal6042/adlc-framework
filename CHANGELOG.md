@@ -6,7 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [1.0.0] - 2026-11-02
 
-First production release.
+First production release. Includes the spec-kit-aligned pipeline (constitution → Gherkin
+requirements → plan → Gate 1 → tasks → code → tests → stack-aware quality gate with a 90%
+coverage floor → Gate 2 → ship), source-agnostic intake with interactive elicitation, and the
+`constitution`, `clarifications`, `detect-stack` and `min-coverage` commands.
 
 ### Fixed
 - **Windows PowerShell:** `adlc.ps1` failed to parse at all (invalid `$var:` references and
@@ -55,8 +58,13 @@ First production release.
 - LICENSE, SECURITY.md, this changelog.
 
 ### Changed
-- Skills renamed `jira-ticket` → `adlc-jira-ticket` and `spec-design` → `adlc-spec-design`
-  so they cannot collide with other skills. The installer removes the old copies.
+- All skills now carry an `adlc-` prefix (`adlc-jira-ticket`, `adlc-spec-design`,
+  `adlc-constitution`, `adlc-gherkin-criteria`, `adlc-quality-gates`,
+  `adlc-requirement-elicitation`, `adlc-task-breakdown`) so they cannot collide with other
+  skills in `~/.claude/skills`. The installer removes the old unprefixed copies.
+- `detect-stack` runs from the git root (not the current folder) and is identical in bash and
+  PowerShell; `min-coverage` ignores invalid `ADLC_MIN_COVERAGE` values; `constitution` no
+  longer aborts PowerShell when it creates the file.
 - Version is read from `core/VERSION` everywhere.
 
 ## [0.3.0]

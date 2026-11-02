@@ -34,55 +34,71 @@ design, approve the release).
 
 | Classic SDLC | ADLC agent |
 |--------------|-----------|
-| Requirement / ticket | `adlc-jira` |
-| Design / spec | `adlc-spec` |
+| Requirement / ticket (the WHAT) | `adlc-jira` |
+| Design / spec (the HOW) | `adlc-spec` |
+| Task breakdown | `adlc-planner` |
 | Implementation | `adlc-coder` |
 | Testing | `adlc-tester` |
 | QA / verification | `adlc-verifier` |
 | Release | `adlc-shipper` |
 | Project management | `/adlc` orchestrator |
 
+Governing all of it is a project **constitution** (`docs/adlc/constitution.md`) — a short set of
+principles every spec is checked against before Gate 1.
+
+**Requirements can come from anywhere.** Intake is source-agnostic: a referenced item (Jira key /
+issue / doc) → Jira (if configured) → **interactive elicitation** (the agent interviews you) →
+stored in local files. A tracker is optional — with no Jira and only a one-line request, the intake
+agent *asks you the right questions* and builds the full requirements spec from your answers.
+
 ---
 
 ## 3. Solution at a glance
 
 ```
-  "add a /health endpoint that returns {status:'ok'} and a test"
-        │
+  constitution.md  ── project principles, scored at Gate 1 ───────────────┐
+                                                                          (check)
+  "add a /health endpoint that returns {status:'ok'} and a test"           │
+        │                                                                  ▼
         ▼
- ┌───────────┐   ┌───────────┐   ╔═══════════╗   ┌───────────┐   ┌───────────┐   ┌───────────┐   ╔═══════════╗   ┌───────────┐
- │ 1. Ticket │──▶│ 2. Spec   │──▶║  GATE 1   ║──▶│ 3. Code   │──▶│ 4. Tests  │──▶│ 5. Verify │──▶║  GATE 2   ║──▶│ 6. Ship   │
- │ adlc-jira │   │ adlc-spec │   ║  approve  ║   │adlc-coder │   │adlc-tester│   │ verifier  │   ║ pre-push  ║   │  shipper  │
- └───────────┘   └───────────┘   ╚═══════════╝   └───────────┘   └───────────┘   └─────┬─────┘   ╚═══════════╝   └───────────┘
-   ticket.md        spec.md         (human)                                      verification.md    (human)      commit+push+PR URL
-                                                       ▲                               │
-                                                       └────────── fail: retry ×3 ─────┘
+ ┌─────────┐  ┌─────────┐  ╔════════╗  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ╔════════╗  ┌─────────┐
+ │1. Ticket│─▶│ 2. Spec │─▶║ GATE 1 ║─▶│3. Tasks │─▶│ 4. Code │─▶│ 5. Tests│─▶│6. Verify│─▶║ GATE 2 ║─▶│ 7. Ship │
+ │adlc-jira│  │adlc-spec│  ║ approve║  │ planner │  │  coder  │  │  tester │  │ verifier│  ║pre-push║  │ shipper │
+ └─────────┘  └─────────┘  ╚════════╝  └─────────┘  └─────────┘  └─────────┘  └────┬────┘  ╚════════╝  └─────────┘
+  ticket.md     spec.md     (human)     tasks.md                            verification.md  (human)   commit+push
+   WHAT/WHY      HOW +                                    ▲                        │                    +PR URL
+              Constit.check                               └───── fail: retry ×3 ───┘
 ```
 
-- **6 specialist agents** + **1 orchestrator**.
+- **7 specialist agents** + **1 orchestrator**, governed by a project **constitution**.
 - **2 human approval gates** (design, release).
 - **1 automatic retry loop** (verify → fix → re-verify).
 - All artifacts saved under the target project's `docs/adlc/<KEY>/` (a full audit trail).
+
+**Aligned with GitHub's [spec-kit](https://github.com/github/spec-kit) Spec-Driven Development:**
+constitution → requirements (`specify`) → plan → tasks → implement — mapped onto ADLC's agents,
+two gates, and deterministic engine.
 
 ---
 
 ## 4. The agents (who does what)
 
-On Claude Code these are **6 isolated sub-agents**, each with a **least-privilege tool set**.
-On single-agent hosts the same 6 roles run inline, one at a time.
+On Claude Code these are **7 isolated sub-agents**, each with a **least-privilege tool set**.
+On single-agent hosts the same 7 roles run inline, one at a time.
 
 | # | Agent | Role | Tools (least privilege) | Produces |
 |---|-------|------|-------------------------|----------|
 | — | **`/adlc`** | **Orchestrator** — runs the pipeline, owns state, enforces gates | delegation + `AskUserQuestion` | `state.md` |
-| 1 | `adlc-jira` | Intake → ticket (Jira or local) | `Bash, Read, Write` | `ticket.md` |
-| 2 | `adlc-spec` | Design/spec doc; **read-only on code** | `Read, Grep, Glob, Write` | `spec.md` |
-| 3 | `adlc-coder` | Implement the approved spec | `Read, Edit, Write, Grep, Glob, Bash` | code on a branch |
-| 4 | `adlc-tester` | Tests for every acceptance criterion | `Read, Edit, Write, Grep, Glob, Bash` | test files |
-| 5 | `adlc-verifier` | Run tests/build; **can't edit code** | `Read, Bash, Grep, Glob` | `verification.md` |
-| 6 | `adlc-shipper` | Commit + push; **git only** | `Bash, Read` | commit + PR compare URL |
+| 1 | `adlc-jira` | Intake → requirements spec (**WHAT**): user stories, **Gherkin** criteria, FRs, success criteria — from a tracker **or by interviewing you** | `Bash, Read, Write, AskUserQuestion` | `ticket.md` |
+| 2 | `adlc-spec` | Technical plan (**HOW**) + **Constitution Check**; **read-only on code** | `Read, Grep, Glob, Write` | `spec.md` |
+| 3 | `adlc-planner` | Decompose the approved spec into an ordered task list | `Read, Write, Grep, Glob` | `tasks.md` |
+| 4 | `adlc-coder` | Implement the tasks | `Read, Edit, Write, Grep, Glob, Bash` | code on a branch |
+| 5 | `adlc-tester` | Tests for every acceptance scenario | `Read, Edit, Write, Grep, Glob, Bash` | test files |
+| 6 | `adlc-verifier` | **Stack-detected quality gate**: format + lint + static analysis + build + tests with **coverage ≥ 90%**; **can't edit code** | `Read, Bash, Grep, Glob` | `verification.md` |
+| 7 | `adlc-shipper` | Commit + push; **git only** | `Bash, Read` | commit + PR compare URL |
 
-**Why 6 and not 1?** Each agent gets a *clean context* and *restricted powers* — the spec and
-verifier agents literally **cannot modify source**; the shipper can **only run git**. This
+**Why 7 and not 1?** Each agent gets a *clean context* and *restricted powers* — the spec, planner,
+and verifier agents literally **cannot modify source**; the shipper can **only run git**. This
 containment is the core safety property.
 
 ---
@@ -91,10 +107,11 @@ containment is the core safety property.
 
 | Gate | When | You see | Choices |
 |------|------|---------|---------|
-| **Gate 1 — Design** | after the spec | `spec.md` summary + open questions | Approve / Request changes / Abort |
+| **Gate 1 — Design** | after the spec | `spec.md` summary + **Constitution Check result** + open questions / `[NEEDS CLARIFICATION]` | Approve / Request changes / Abort |
 | **Gate 2 — Release** | before the push | branch, diff summary, commit message | Approve & push / Commit locally / Request changes / Abort |
 
-Gate 1 is the highest-leverage moment: fixing the *plan* is far cheaper than fixing code.
+Gate 1 is the highest-leverage moment: fixing the *plan* is far cheaper than fixing code. Tasks are
+generated only *after* Gate 1, so you approve the design before it's decomposed and built.
 
 ---
 
@@ -105,10 +122,12 @@ differs per tool. So a generator turns one `core/` into a thin adapter per host.
 
 ```
 core/  ── SINGLE SOURCE OF TRUTH (edit here) ─────────────────────────────
-│  orchestrator.md      the runbook (6 roles, 2 gates, retry loop)
+│  orchestrator.md      the runbook (7 roles, 2 gates, retry loop)
 │  stages/*.md          one instruction file per agent
-│  skills/*.md          reusable know-how (adlc-workflow, adlc-jira-ticket, adlc-spec-design)
-│  templates/*.md       ticket / spec / state / verification
+│  skills/*.md          reusable know-how (adlc-workflow, -constitution, -jira-ticket,
+│                       -requirement-elicitation, -spec-design, -gherkin-criteria,
+│                       -task-breakdown, -quality-gates)
+│  templates/*.md       constitution / ticket / spec / tasks / state / verification
 │  scripts/             DETERMINISTIC engine: adlc (bash), adlc.ps1 (PowerShell twin),
 │                       adlc.cmd (cmd shim), jira_ticket.py, lib.sh
 │  VERSION              single version number used everywhere
@@ -152,13 +171,17 @@ Two design moves make it provider-independent:
 All mechanical work is a plain script — testable, reproducible, model-independent:
 
 ```bash
+adlc constitution                          # create/print docs/adlc/constitution.md (project principles)
 adlc init "add a health endpoint"         # -> ADLC-001, seeds docs/adlc/ADLC-001/
 adlc next-key                              # next local ticket key
 adlc status <KEY>                          # print the run's state
 adlc get-state <KEY> <field>               # read pipeline state
 adlc set-state <KEY> <field> <value>       # advance pipeline state
 adlc approve <KEY> gate1|gate2             # record a human approval
-adlc scaffold <KEY> spec|verification      # write a template into the run folder
+adlc clarifications <KEY>                  # open [NEEDS CLARIFICATION: ...] items (exit 1 if any)
+adlc scaffold <KEY> spec|tasks|verification  # write a template into the run folder
+adlc detect-stack                          # project stack(s) for the quality gate
+adlc min-coverage                          # coverage floor (ADLC_MIN_COVERAGE or 90)
 adlc branch <KEY>                          # check out / create the feature branch
 adlc compare-url <branch>                  # PR link (GitHub, GitLab, Bitbucket)
 adlc ship <KEY> [--no-push]                # guarded commit (+push) + PR link
@@ -189,11 +212,14 @@ adlc version
 Everything lands in the **target project**, never in the framework:
 
 ```
-docs/adlc/<KEY>/
-├── ticket.md          request + acceptance criteria           (agent 1)
-├── spec.md            design doc reviewed at Gate 1            (agent 2)
-├── state.md           pipeline state + gate approvals (resumable)
-└── verification.md    test/build results                      (agent 5)
+docs/adlc/
+├── constitution.md    project principles (once per repo)      (adlc constitution)
+└── <KEY>/
+    ├── ticket.md          requirements spec — WHAT/WHY, Gherkin criteria   (agent 1)
+    ├── spec.md            technical plan — HOW + Constitution Check, reviewed at Gate 1  (agent 2)
+    ├── tasks.md           ordered task breakdown of the approved spec      (agent 3)
+    ├── state.md           pipeline state + gate approvals (resumable)
+    └── verification.md    test/build results                              (agent 6)
 docs/adlc/tickets/<KEY>.md   local-mode ticket mirror
 ```
 
@@ -210,8 +236,9 @@ docs/adlc/tickets/<KEY>.md   local-mode ticket mirror
    scripts are marked executable in git; bash, PowerShell and cmd are all covered and tested
    in CI on Linux, macOS and Windows.
 5. **`model: inherit`** — no assumption about the host's default model.
-6. **Graceful degradation** — no Jira creds → local tickets; no git remote → local commit; a
-   failed push keeps the commit and reports it.
+6. **Graceful degradation** — no requirement source → intake **interviews you** and stores locally
+   (a tracker is optional); no interactive user → infer + flag `[NEEDS CLARIFICATION]`; no Jira
+   creds → local tickets; no git remote → local commit; a failed push keeps the commit and reports it.
 7. **Agents can't approve for you** — prompts allow `adlc approve` only after the human says
    so, and treat ticket/code/tool text as data, not instructions. See [SECURITY.md](SECURITY.md).
 
@@ -246,7 +273,7 @@ adlc doctor
 | `--uninstall` | remove everything the installer added (`all` also removes the PATH entry) |
 
 Claude Code honours `CLAUDE_CONFIG_DIR` if you use a custom config folder. Upgrading from v0.3
-removes the old `jira-ticket` / `spec-design` skills automatically.
+removes the old unprefixed skills (`jira-ticket`, `spec-design`, `constitution`, …) automatically.
 
 **Optional Jira:** copy `.env.example` → `.env` (in your project or this folder), or export
 `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`. Without them, the pipeline
@@ -265,14 +292,16 @@ uses local ticket files.
 
 ## 12. Usage — step by step
 
-1. Open your project and run `/adlc "add a /health endpoint and a test"`.
-2. **Agent 1** creates the ticket → `docs/adlc/ADLC-001/`.
-3. **Agent 2** writes `spec.md`.
-4. **🚦 Gate 1** — you read the spec and Approve.
-5. **Agents 3→4→5** implement, test, and verify (auto-retry on failure).
-6. **🚦 Gate 2** — you Approve the push.
-7. **Agent 6** commits, pushes, prints a **PR compare URL** — you open the PR.
-8. Resume anytime with `/adlc resume ADLC-001`; check `/adlc status ADLC-001`.
+1. (Once per repo) run `adlc constitution` and set your project's principles.
+2. Open your project and run `/adlc "add a /health endpoint and a test"`.
+3. **Agent 1** writes the requirements ticket (WHAT) → `docs/adlc/ADLC-001/`.
+4. **Agent 2** writes `spec.md` (HOW) with a Constitution Check.
+5. **🚦 Gate 1** — you read the spec + Constitution Check and Approve.
+6. **Agent 3** breaks the approved spec into `tasks.md`.
+7. **Agents 4→5→6** implement the tasks, test, and verify (auto-retry on failure).
+8. **🚦 Gate 2** — you Approve the push.
+9. **Agent 7** commits, pushes, prints a **PR compare URL** — you open the PR.
+10. Resume anytime with `/adlc resume ADLC-001`; check `/adlc status ADLC-001`.
 
 ---
 
@@ -281,16 +310,17 @@ uses local ticket files.
 ```
 > /adlc "add a /health endpoint that returns {status:'ok'} and a test"
 
-[1/6 intake ] created ADLC-001  (local mode) — docs/adlc/ADLC-001/ticket.md
-[2/6 spec   ] wrote docs/adlc/ADLC-001/spec.md
+[1/7 intake ] created ADLC-001  (local mode) — docs/adlc/ADLC-001/ticket.md (WHAT)
+[2/7 spec   ] wrote docs/adlc/ADLC-001/spec.md — Constitution Check: PASS
      GATE 1 → review the spec.  [Approve] [Request changes] [Abort]
 > Approve
-[3/6 code   ] branch adlc/ADLC-001-add-health-endpoint ; edited app/main.py
-[4/6 tests  ] added tests/test_health.py (1 test → criterion "returns 200 {status:ok}")
-[5/6 verify ] PASS — pytest: 1 passed in 0.12s
+[3/7 tasks  ] wrote tasks.md — 3 tasks (T001–T003), all scenarios covered
+[4/7 code   ] branch adlc/ADLC-001-add-health-endpoint ; edited app/main.py (T001–T002)
+[5/7 tests  ] added tests/test_health.py (1 test → scenario "Health check returns ok")
+[6/7 verify ] stack=python · format✔ lint✔ analysis✔ · pytest 1 passed · coverage 96% ≥ 90% → PASS
      GATE 2 → push?  [Approve & push] [Commit locally] [Request changes] [Abort]
 > Approve & push
-[6/6 ship   ] committed 8f2c1a9 ; pushed adlc/ADLC-001-add-health-endpoint
+[7/7 ship   ] committed 8f2c1a9 ; pushed adlc/ADLC-001-add-health-endpoint
      PR: https://github.com/you/my-app/compare/adlc/ADLC-001-add-health-endpoint?expand=1
 ```
 
@@ -313,6 +343,19 @@ uses local ticket files.
 
 ## 15. Key design decisions
 
+- **Spec-Driven Development (spec-kit-aligned)** — a project **constitution** governs every run;
+  requirements (WHAT) are separated from the technical plan (HOW); the approved plan is decomposed
+  into a task list before code. Designs are scored against the constitution at Gate 1.
+- **Source-agnostic requirement gathering** — a tracker is optional. When none supplies the detail,
+  intake **interviews the requester** (spec-kit's *clarify*) and stores locally, so a thin request
+  still becomes a complete, testable requirements spec.
+- **Stack-independent quality gate** — the verifier auto-detects the project (Spring Boot, React,
+  Vue, Android, Python, Go, …) and runs its *standard* tools — Spotless/Prettier/ktlint (format),
+  Checkstyle/ESLint/ruff (lint), SpotBugs/detekt/typescript-eslint (static analysis), JaCoCo/Jest/
+  pytest-cov (tests) — enforcing **coverage ≥ 90%**. Prefers the project's own commands; a coverage
+  number that can't be measured is a FAIL, never a silent pass.
+- **Gherkin acceptance criteria** — every criterion is a `Given/When/Then` scenario, authored once
+  at intake, frozen into the spec, and mapped one-to-one to a test. Unambiguous, testable, traceable.
 - **Human-in-the-loop at 2 gates**, not 0 and not every step — safety without friction.
 - **Least-privilege tools per agent** — containment by construction.
 - **Deterministic core in scripts** — reproducible, cheap, and model-independent.
@@ -337,9 +380,10 @@ uses local ticket files.
 adlc-framework/
 ├── core/              # single source of truth (edit here)
 │   ├── orchestrator.md
-│   ├── stages/{1-intake,2-spec,3-code,4-tests,5-verify,6-ship}.md
-│   ├── skills/{adlc-workflow,adlc-jira-ticket,adlc-spec-design}.md
-│   ├── templates/{ticket,spec,state,verification}.md
+│   ├── stages/{1-intake,2-spec,3-tasks,4-code,5-tests,6-verify,7-ship}.md
+│   ├── skills/adlc-{workflow,constitution,jira-ticket,requirement-elicitation,spec-design,
+│   │               gherkin-criteria,task-breakdown,quality-gates}.md
+│   ├── templates/{constitution,ticket,spec,tasks,state,verification}.md
 │   ├── scripts/{adlc, adlc.ps1, adlc.cmd, jira_ticket.py, lib.sh}
 │   └── VERSION
 ├── adapters/          # GENERATED by build.py — do not hand-edit
@@ -369,7 +413,7 @@ python3 build.py --package    # dist/adlc-framework-<version>.zip for a release
 | 2 | The problem | §1 — AI speed, no SDLC discipline |
 | 3 | The idea | §2 — SDLC stage → agent table |
 | 4 | Solution at a glance | §3 — the pipeline diagram |
-| 5 | Meet the agents | §4 — agent table + "why 6" |
+| 5 | Meet the agents | §4 — agent table + "why 7" |
 | 6 | Human-in-the-loop | §5 — the two gates |
 | 7 | Architecture | §6 — core + generated adapters diagram |
 | 8 | Not locked to one LLM | §7 — roles-not-subagents + host table |

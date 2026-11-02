@@ -144,6 +144,49 @@ switch_to_branch() { # branch: check it out, creating it from HEAD if needed
   fi
 }
 
+# --- stack detection -------------------------------------------------------
+# Print the detected project stack(s) from marker files at the project root.
+# Provider-neutral: names stacks so the verifier can pick the right standard tools.
+# Keep in sync with Get-Stack in adlc.ps1.
+detect_stack() (
+  cd "$(adlc_project_root)" || exit 1
+  found=""
+  if [ -f pom.xml ]; then found="$found java-maven"; fi
+  if [ -f build.gradle ] || [ -f build.gradle.kts ]; then
+    if grep -qs "com\.android" build.gradle build.gradle.kts settings.gradle settings.gradle.kts \
+       || find . -maxdepth 4 -name AndroidManifest.xml 2>/dev/null | grep -q .; then
+      found="$found android"
+    else
+      found="$found java-gradle"
+    fi
+  fi
+  if [ -f package.json ]; then
+    if grep -qs '"react"' package.json; then found="$found react"
+    elif grep -qs '"vue"' package.json; then found="$found vue"
+    elif grep -qs '"@angular/core"' package.json; then found="$found angular"
+    else found="$found node"
+    fi
+  fi
+  if [ -f pyproject.toml ] || [ -f setup.py ] || [ -f requirements.txt ]; then found="$found python"; fi
+  if [ -f go.mod ]; then found="$found go"; fi
+  if [ -f Cargo.toml ]; then found="$found rust"; fi
+  if [ -f Gemfile ]; then found="$found ruby"; fi
+  if [ -f composer.json ]; then found="$found php"; fi
+  if ls ./*.csproj ./*.sln >/dev/null 2>&1; then found="$found dotnet"; fi
+  found="${found# }"
+  echo "${found:-unknown}"
+)
+
+# Coverage floor: ADLC_MIN_COVERAGE (0-100) if valid, else 90.
+min_coverage() {
+  local v="${ADLC_MIN_COVERAGE:-}"
+  case "$v" in
+    '') echo 90 ;;
+    *[!0-9]*) warn "ignoring ADLC_MIN_COVERAGE='$v' (expected 0-100); using 90"; echo 90 ;;
+    *) if [ "$((10#$v))" -le 100 ]; then echo "$((10#$v))"; else warn "ignoring ADLC_MIN_COVERAGE='$v' (expected 0-100); using 90"; echo 90; fi ;;
+  esac
+}
+
 # --- misc ------------------------------------------------------------------
 slugify() { # text -> kebab-case, max 6 words / 50 chars, never empty
   local s

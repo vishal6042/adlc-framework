@@ -31,8 +31,9 @@ END = "<!-- adlc:end -->"
 BEGIN_PREFIX = "<!-- adlc:begin"
 ENV_FILE_NAME = ".adlc_env"
 RC_LINE = '[ -f "$HOME/.adlc_env" ] && . "$HOME/.adlc_env"  # adlc-framework'
-# Skill folders installed by v0.3 and earlier, before names were prefixed.
-LEGACY_SKILLS = ["jira-ticket", "spec-design"]
+# Skill folders installed by earlier versions, before names were prefixed.
+LEGACY_SKILLS = ["jira-ticket", "spec-design", "constitution", "gherkin-criteria", "quality-gates",
+                 "requirement-elicitation", "task-breakdown"]
 IS_WINDOWS = os.name == "nt"
 
 

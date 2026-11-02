@@ -285,6 +285,53 @@ class CliContract:
         git(self.repo.path, "remote", "remove", "origin")
         self.assertEqual(self.adlc("compare-url", "b/1").stdout.strip(), "")
 
+    # --- spec-kit helpers ----------------------------------------------------------
+    def test_scaffold_tasks(self):
+        key = self.init_run("make tasks")
+        self.adlc("scaffold", key, "tasks")
+        self.assertIn(f"# Tasks: {key}", self.repo.read(f"docs/adlc/{key}/tasks.md"))
+
+    def test_constitution_created_once(self):
+        r = self.adlc("constitution")
+        path = r.stdout.strip()
+        self.assertTrue(path.replace("\\", "/").endswith("docs/adlc/constitution.md"), path)
+        self.assertIn("created", r.stderr)
+        text = self.repo.read("docs/adlc/constitution.md")
+        self.assertIn(f"{datetime.date.today():%Y-%m-%d}", text)
+        self.repo.write("docs/adlc/constitution.md", "mine\n")
+        r = self.adlc("constitution")
+        self.assertEqual(r.stderr.strip(), "")
+        self.assertEqual(self.repo.read("docs/adlc/constitution.md"), "mine\n")
+
+    def test_clarifications(self):
+        key = self.init_run()
+        self.repo.write(f"docs/adlc/{key}/ticket.md", "Mark unknowns with [NEEDS CLARIFICATION].\n")
+        self.assertIn("no open clarifications", self.adlc("clarifications", key).stdout)
+        self.repo.write(f"docs/adlc/{key}/spec.md", "a\n- Auth? [NEEDS CLARIFICATION: which IdP?]\n")
+        r = self.adlc("clarifications", key, ok=1)
+        self.assertRegex(r.stdout.strip(), r"spec\.md:2:- Auth\? \[NEEDS CLARIFICATION: which IdP\?\]$")
+        self.adlc("clarifications", "ADLC-404", ok=1)
+        self.adlc("clarifications", ok=2)
+
+    def test_detect_stack(self):
+        self.assertEqual(self.adlc("detect-stack").stdout.strip(), "unknown")
+        self.repo.write("package.json", '{"dependencies": {"react": "18"}}\n')
+        self.repo.write("pyproject.toml", "[project]\n")
+        self.repo.write("build.gradle", "plugins {}\n")
+        self.repo.write("app/src/main/AndroidManifest.xml", "<manifest/>\n")
+        self.assertEqual(self.adlc("detect-stack").stdout.strip(), "android react python")
+        sub = self.repo.path / "app"
+        r = self.runner.run(sub, "detect-stack", env=self.env)
+        self.assertEqual(r.stdout.strip(), "android react python", "detects from the repo root")
+
+    def test_min_coverage(self):
+        self.assertEqual(self.adlc("min-coverage").stdout.strip(), "90")
+        self.assertEqual(self.adlc("min-coverage", env=clean_env(ADLC_MIN_COVERAGE="75")).stdout.strip(), "75")
+        r = self.adlc("min-coverage", env=clean_env(ADLC_MIN_COVERAGE="150"))
+        self.assertEqual(r.stdout.strip(), "90")
+        self.assertIn("ignoring", r.stderr)
+        self.assertEqual(self.adlc("min-coverage", env=clean_env(ADLC_MIN_COVERAGE="abc")).stdout.strip(), "90")
+
     # --- doctor / jira passthrough ---------------------------------------------------
     def test_doctor(self):
         out = self.adlc("doctor").stdout
@@ -321,12 +368,14 @@ class ParityTest(unittest.TestCase):
                 env = clean_env()
                 for args in (["init", TRICKY_TITLE], ["set-state", "ADLC-001", "jira_mode", "local"],
                              ["set-state", "ADLC-001", "extra", "a|b"], ["approve", "ADLC-001", "gate1"],
-                             ["scaffold", "ADLC-001", "spec"]):
+                             ["scaffold", "ADLC-001", "spec"], ["scaffold", "ADLC-001", "tasks"],
+                             ["constitution"]):
                     res = r.run(repo.path, *args, env=env)
                     self.assertEqual(res.returncode, 0, f"{r.name} {args}: {res.stderr}")
                 outputs.append({p: repo.file(p).read_bytes() for p in (
                     "docs/adlc/ADLC-001/state.md", "docs/adlc/ADLC-001/ticket.md",
-                    "docs/adlc/ADLC-001/spec.md", "docs/adlc/tickets/ADLC-001.md")})
+                    "docs/adlc/ADLC-001/spec.md", "docs/adlc/ADLC-001/tasks.md",
+                    "docs/adlc/tickets/ADLC-001.md", "docs/adlc/constitution.md")})
             finally:
                 repo.cleanup()
         self.assertEqual(outputs[0], outputs[1])

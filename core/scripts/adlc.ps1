@@ -40,8 +40,12 @@ Usage:
   adlc get-state <KEY> <field>      read one state field
   adlc set-state <KEY> <f> <value>  write one state field
   adlc approve <KEY> gate1|gate2    record a human approval
-  adlc scaffold <KEY> spec|verification [--force]
+  adlc scaffold <KEY> spec|tasks|verification [--force]
                                     write a template into docs/adlc/<KEY>/
+  adlc constitution                 create (if missing) and print docs/adlc/constitution.md
+  adlc clarifications <KEY>         list open [NEEDS CLARIFICATION: ...] markers (exit 1 if any)
+  adlc detect-stack                 print the project's detected stack(s)
+  adlc min-coverage                 print the coverage floor (ADLC_MIN_COVERAGE or 90)
   adlc branch <KEY>                 check out (create if needed) the feature branch
   adlc compare-url <branch>         print the PR/MR URL for the origin remote
   adlc ship <KEY> [--no-push]       commit (+push) the change, print the PR URL
@@ -50,7 +54,8 @@ Usage:
   adlc version                      print the framework version
 
 Environment: ADLC_BRANCH_PREFIX (default adlc), ADLC_REMOTE (default origin),
-ADLC_DOCS_DIR (default <repo>/docs/adlc), JIRA_* (see .env.example).
+ADLC_DOCS_DIR (default <repo>/docs/adlc), ADLC_MIN_COVERAGE (default 90),
+JIRA_* (see .env.example).
 '@
 }
 
@@ -303,6 +308,51 @@ function Get-CompareUrl([string]$branch) {
   return "$base/compare/$branch" + '?expand=1'
 }
 
+# Detected project stack(s) from marker files at the project root.
+# Keep in sync with detect_stack in lib.sh.
+function Get-Stack {
+  $root = Get-ProjectRoot
+  $has = { param($n) Test-Path -LiteralPath (Join-Path $root $n) }
+  $f = @()
+  if (& $has 'pom.xml') { $f += 'java-maven' }
+  if ((& $has 'build.gradle') -or (& $has 'build.gradle.kts')) {
+    $android = $false
+    foreach ($g in @('build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts')) {
+      if ((& $has $g) -and ((Read-Text (Join-Path $root $g)) -cmatch 'com\.android')) { $android = $true }
+    }
+    if (-not $android) {
+      $m = Get-ChildItem -LiteralPath $root -Recurse -Depth 3 -Filter 'AndroidManifest.xml' -ErrorAction SilentlyContinue | Select-Object -First 1
+      $android = ($null -ne $m)
+    }
+    if ($android) { $f += 'android' } else { $f += 'java-gradle' }
+  }
+  if (& $has 'package.json') {
+    $pkg = Read-Text (Join-Path $root 'package.json')
+    if ($pkg -cmatch '"react"') { $f += 'react' }
+    elseif ($pkg -cmatch '"vue"') { $f += 'vue' }
+    elseif ($pkg -cmatch '"@angular/core"') { $f += 'angular' }
+    else { $f += 'node' }
+  }
+  if ((& $has 'pyproject.toml') -or (& $has 'setup.py') -or (& $has 'requirements.txt')) { $f += 'python' }
+  if (& $has 'go.mod') { $f += 'go' }
+  if (& $has 'Cargo.toml') { $f += 'rust' }
+  if (& $has 'Gemfile') { $f += 'ruby' }
+  if (& $has 'composer.json') { $f += 'php' }
+  $dn = @(Get-ChildItem -LiteralPath $root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.csproj' -or $_.Extension -eq '.sln' })
+  if ($dn.Count -gt 0) { $f += 'dotnet' }
+  if ($f.Count -gt 0) { return ($f -join ' ') }
+  return 'unknown'
+}
+
+# Coverage floor: ADLC_MIN_COVERAGE (0-100) if valid, else 90.
+function Get-MinCoverage {
+  $v = $env:ADLC_MIN_COVERAGE
+  if (-not $v) { return '90' }
+  if ($v -match '^[0-9]+$' -and [long]$v -le 100) { return ([string][int]$v) }
+  [Console]::Error.WriteLine("adlc: ignoring ADLC_MIN_COVERAGE='$v' (expected 0-100); using 90")
+  return '90'
+}
+
 function Get-VerificationResult([string]$path) {
   foreach ($line in (Read-Lines $path)) {
     if ($line -match 'Result:') { return (($line -replace '[*_` \t-]', '').ToUpperInvariant()) }
@@ -449,6 +499,37 @@ switch -CaseSensitive ($cmd) {
     break
   }
 
+  'constitution' {
+    $d = Get-AdlcDir; $cfile = "$d/constitution.md"
+    if (-not (Test-Path -LiteralPath $cfile)) {
+      New-Item -ItemType Directory -Force -Path $d | Out-Null
+      Write-Text $cfile (Expand-Template 'constitution.md' @{ '<DATE>' = (Get-Date -Format 'yyyy-MM-dd') })
+      [Console]::Error.WriteLine("adlc: created $cfile - edit it to set your project's principles")
+    }
+    $cfile
+    break
+  }
+
+  'clarifications' {
+    # A real marker carries the question after a colon; the bare form in template prose is guidance.
+    if ($rest.Count -lt 1) { UsageError 'clarifications needs a KEY' }
+    $key = $rest[0]; Assert-Run $key; $found = $false
+    foreach ($n in @('ticket', 'spec', 'tasks')) {
+      $f = (Get-KeyDir $key) + "/$n.md"
+      if (-not (Test-Path -LiteralPath $f)) { continue }
+      $lines = Read-Lines $f
+      for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i].Contains('[NEEDS CLARIFICATION:')) { $found = $true; "${f}:$($i + 1):$($lines[$i])" }
+      }
+    }
+    if ($found) { exit 1 }
+    "no open clarifications for $key"
+    break
+  }
+
+  'detect-stack' { Get-Stack; break }
+  'min-coverage' { Get-MinCoverage; break }
+
   'status' {
     if ($rest.Count -lt 1) { UsageError 'status needs a KEY' }
     Assert-Run $rest[0]
@@ -476,9 +557,9 @@ switch -CaseSensitive ($cmd) {
   }
 
   'scaffold' {
-    if ($rest.Count -lt 2) { UsageError 'scaffold needs <KEY> spec|verification' }
+    if ($rest.Count -lt 2) { UsageError 'scaffold needs <KEY> spec|tasks|verification' }
     $key = $rest[0]; $kind = $rest[1]; Assert-Run $key
-    if (@('spec', 'verification') -cnotcontains $kind) { UsageError 'scaffold kind must be spec or verification' }
+    if (@('spec', 'tasks', 'verification') -cnotcontains $kind) { UsageError 'scaffold kind must be spec, tasks or verification' }
     $force = ($rest.Count -ge 3 -and $rest[2] -eq '--force')
     $out = (Get-KeyDir $key) + "/$kind.md"
     if ((Test-Path -LiteralPath $out) -and -not $force) { "$out (exists, left unchanged)"; break }

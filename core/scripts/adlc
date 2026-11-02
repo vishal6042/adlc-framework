@@ -21,8 +21,12 @@ Usage:
   adlc get-state <KEY> <field>      read one state field
   adlc set-state <KEY> <f> <value>  write one state field
   adlc approve <KEY> gate1|gate2    record a human approval
-  adlc scaffold <KEY> spec|verification [--force]
+  adlc scaffold <KEY> spec|tasks|verification [--force]
                                     write a template into docs/adlc/<KEY>/
+  adlc constitution                 create (if missing) and print docs/adlc/constitution.md
+  adlc clarifications <KEY>         list open [NEEDS CLARIFICATION: ...] markers (exit 1 if any)
+  adlc detect-stack                 print the project's detected stack(s)
+  adlc min-coverage                 print the coverage floor (ADLC_MIN_COVERAGE or 90)
   adlc branch <KEY>                 check out (create if needed) the feature branch
   adlc compare-url <branch>         print the PR/MR URL for the origin remote
   adlc ship <KEY> [--no-push]       commit (+push) the change, print the PR URL
@@ -31,7 +35,8 @@ Usage:
   adlc version                      print the framework version
 
 Environment: ADLC_BRANCH_PREFIX (default adlc), ADLC_REMOTE (default origin),
-ADLC_DOCS_DIR (default <repo>/docs/adlc), JIRA_* (see .env.example).
+ADLC_DOCS_DIR (default <repo>/docs/adlc), ADLC_MIN_COVERAGE (default 90),
+JIRA_* (see .env.example).
 EOF
 }
 
@@ -114,6 +119,35 @@ case "$cmd" in
     echo "$key"
     ;;
 
+  constitution) # create docs/adlc/constitution.md from the template if absent; print its path
+    cfile="$(adlc_dir)/constitution.md"
+    if [ ! -f "$cfile" ]; then
+      mkdir -p "$(adlc_dir)"
+      render_template "$(adlc_templates_dir)/constitution.md" "<DATE>" "$(date +%Y-%m-%d)" > "$cfile"
+      warn "created $cfile - edit it to set your project's principles"
+    fi
+    echo "$cfile"
+    ;;
+
+  clarifications) # KEY -> list [NEEDS CLARIFICATION: ...] markers; exit 1 if any remain
+    # A real marker carries the question after a colon; the bare form in template prose
+    # ("mark unknowns with [NEEDS CLARIFICATION]") is guidance, not an open item.
+    [ $# -ge 1 ] || usage_error "clarifications needs a KEY"
+    key="$1"; require_run "$key"; found=0
+    for f in "$(key_dir "$key")/ticket.md" "$(key_dir "$key")/spec.md" "$(key_dir "$key")/tasks.md"; do
+      [ -f "$f" ] || continue
+      if hits="$(grep -nF '[NEEDS CLARIFICATION:' "$f")"; then
+        found=1
+        printf '%s\n' "$hits" | while IFS= read -r line; do printf '%s:%s\n' "$f" "${line%$'\r'}"; done
+      fi
+    done
+    [ "$found" = 0 ] || exit 1
+    echo "no open clarifications for $key"
+    ;;
+
+  detect-stack) detect_stack ;;
+  min-coverage) min_coverage ;;
+
   status)
     [ $# -ge 1 ] || usage_error "status needs a KEY"
     require_run "$1"; cat "$(state_file "$1")" ;;
@@ -138,10 +172,10 @@ case "$cmd" in
     echo "recorded $gate approval for $key"
     ;;
 
-  scaffold) # KEY spec|verification [--force]
-    [ $# -ge 2 ] || usage_error "scaffold needs <KEY> spec|verification"
+  scaffold) # KEY spec|tasks|verification [--force]
+    [ $# -ge 2 ] || usage_error "scaffold needs <KEY> spec|tasks|verification"
     key="$1"; kind="$2"; force="${3:-}"; require_run "$key"
-    case "$kind" in spec|verification) ;; *) usage_error "scaffold kind must be spec or verification" ;; esac
+    case "$kind" in spec|tasks|verification) ;; *) usage_error "scaffold kind must be spec, tasks or verification" ;; esac
     out="$(key_dir "$key")/$kind.md"
     if [ -e "$out" ] && [ "$force" != "--force" ]; then
       echo "$out (exists, left unchanged)"; exit 0

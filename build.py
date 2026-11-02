@@ -30,8 +30,9 @@ DIST = ROOT / "dist"
 # All hosts call `adlc` on PATH (the installer adds core/scripts to PATH).
 ADLC_CMD = "adlc"
 
-STAGE_ORDER = ["1-intake", "2-spec", "3-code", "4-tests", "5-verify", "6-ship"]
-SKILLS = ["adlc-workflow", "adlc-jira-ticket", "adlc-spec-design"]
+STAGE_ORDER = ["1-intake", "2-spec", "3-tasks", "4-code", "5-tests", "6-verify", "7-ship"]
+SKILLS = ["adlc-workflow", "adlc-constitution", "adlc-jira-ticket", "adlc-requirement-elicitation",
+          "adlc-spec-design", "adlc-gherkin-criteria", "adlc-task-breakdown", "adlc-quality-gates"]
 AUTHOR = {"name": "Vishal Bharti", "email": "bharti.vishal4@gmail.com"}
 REPO_URL = "https://github.com/vishal6042/adlc-framework"
 

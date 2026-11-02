@@ -46,7 +46,7 @@ class BuildTest(unittest.TestCase):
     def test_claude_frontmatter(self):
         base = ROOT / "adapters" / "claude-code"
         agents = sorted((base / "agents").glob("*.md"))
-        self.assertEqual(len(agents), 6)
+        self.assertEqual(len(agents), 7)
         for p in agents:
             meta = read_frontmatter(p)
             self.assertEqual(meta["name"], p.stem)
