@@ -194,7 +194,7 @@ class InstallTest(unittest.TestCase):
             inst.register_path()
             inst.register_path()
         bashrc = (self.home / ".bashrc").read_text(encoding="utf-8")
-        self.assertEqual(bashrc.count(".adlc_env"), 1)
+        self.assertEqual(bashrc.count(install.RC_LINE), 1, "hook line added exactly once")
         self.assertTrue((self.home / ".zshrc").exists())
         env_file = (self.home / ".adlc_env").read_text(encoding="utf-8")
         self.assertIn(str(install.SCRIPTS), env_file)
