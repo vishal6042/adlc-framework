@@ -6,3 +6,8 @@
 # OS / editor noise
 .DS_Store
 Thumbs.db
+
+# Build / test output
+dist/
+__pycache__/
+*.pyc

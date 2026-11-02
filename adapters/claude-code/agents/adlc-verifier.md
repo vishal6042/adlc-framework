@@ -1,6 +1,6 @@
 ---
 name: adlc-verifier
-description: ADLC stage 5 (verify). Auto-detect and run the project's tests/build/lint, then write a PASS/FAIL report to verification.md. Use PROACTIVELY after tests are written. On FAIL the orchestrator loops back to stage 3.
+description: "ADLC stage 5 (verify). Auto-detect and run the project's tests/build/lint, then write a PASS/FAIL report to verification.md. Use PROACTIVELY after tests are written. On FAIL the orchestrator loops back to stage 3."
 tools: Read, Bash, Grep, Glob
 model: inherit
 ---
@@ -24,10 +24,13 @@ seen it succeed.
 1. Read `spec.md` to know what "done" means and which tests matter.
 2. Detect the toolchain (look for `package.json`, `pyproject.toml`, `go.mod`, `Makefile`, …).
 3. Run the tests (and a quick build/lint if fast); capture stdout/stderr and exit codes.
-4. Write `docs/adlc/<KEY>/verification.md` (Result: PASS|FAIL, exact commands, output excerpts,
-   coverage-vs-criteria). Bump the attempt counter:
-   `adlc set-state <KEY> verify_attempts <n>`.
-5. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
+4. Write the report: `adlc scaffold <KEY> verification --force` creates a fresh
+   `docs/adlc/<KEY>/verification.md` for this attempt; fill in the exact commands, output
+   excerpts and coverage-vs-criteria. The result line must be exactly `- Result: PASS` or
+   `- Result: FAIL` — `adlc ship` reads it and refuses anything but PASS.
+5. Bump the attempt counter: read `adlc get-state <KEY> verify_attempts`, add 1, and write it
+   with `adlc set-state <KEY> verify_attempts <n>` (you own this counter; nobody else bumps it).
+6. On PASS: `adlc set-state <KEY> current_stage ship`. On FAIL: leave stage at `verify`; the
    orchestrator loops to stage 3.
 
 ## Output (hand back to the orchestrator)

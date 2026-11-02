@@ -1,6 +1,10 @@
 # ADLC Framework
 ### Agentic Development Life Cycle — from a one-line request to a reviewed pull request, automatically
 
+[![CI](https://github.com/vishal6042/adlc-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/vishal6042/adlc-framework/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Version](https://img.shields.io/badge/version-1.0.0-informational)
+
 > A pipeline of specialized AI agents that takes a plain-English feature request through
 > **ticket → design spec → human approval → code → tests → verification → human approval → git push** —
 > and runs the *same* pipeline on **Claude Code, Cline, Gemini CLI**, or any `AGENTS.md`-aware tool,
@@ -103,9 +107,11 @@ differs per tool. So a generator turns one `core/` into a thin adapter per host.
 core/  ── SINGLE SOURCE OF TRUTH (edit here) ─────────────────────────────
 │  orchestrator.md      the runbook (6 roles, 2 gates, retry loop)
 │  stages/*.md          one instruction file per agent
-│  skills/*.md          reusable know-how (jira, spec-design, lifecycle)
+│  skills/*.md          reusable know-how (adlc-workflow, adlc-jira-ticket, adlc-spec-design)
 │  templates/*.md       ticket / spec / state / verification
-│  scripts/             DETERMINISTIC engine: adlc (bash), adlc.ps1, adlc.cmd, jira_ticket.py
+│  scripts/             DETERMINISTIC engine: adlc (bash), adlc.ps1 (PowerShell twin),
+│                       adlc.cmd (cmd shim), jira_ticket.py, lib.sh
+│  VERSION              single version number used everywhere
 │
 ▼  build.py  (generates, never hand-edit adapters) ───────────────────────
 │
@@ -146,19 +152,35 @@ Two design moves make it provider-independent:
 All mechanical work is a plain script — testable, reproducible, model-independent:
 
 ```bash
-adlc init "add a health endpoint"     # -> ADLC-001, seeds docs/adlc/ADLC-001/
-adlc next-key                          # next local ticket key
-adlc jira mode | pick | create ...     # dual-mode ticketing (Jira REST or local)
-adlc get-state <KEY> <field>           # read pipeline state
-adlc set-state <KEY> <field> <value>   # advance pipeline state
-adlc approve <KEY> gate1|gate2         # record a human approval
-adlc compare-url <branch>              # PR compare URL from the git remote
-adlc ship  <KEY> [--no-push]           # commit (+push) + print compare URL
+adlc init "add a health endpoint"         # -> ADLC-001, seeds docs/adlc/ADLC-001/
+adlc next-key                              # next local ticket key
+adlc status <KEY>                          # print the run's state
+adlc get-state <KEY> <field>               # read pipeline state
+adlc set-state <KEY> <field> <value>       # advance pipeline state
+adlc approve <KEY> gate1|gate2             # record a human approval
+adlc scaffold <KEY> spec|verification      # write a template into the run folder
+adlc branch <KEY>                          # check out / create the feature branch
+adlc compare-url <branch>                  # PR link (GitHub, GitLab, Bitbucket)
+adlc ship <KEY> [--no-push]                # guarded commit (+push) + PR link
+adlc jira mode | pick | get <KEY> | create # Jira Cloud (or local mode)
+adlc doctor                                # check git, python, PATH, Jira config
+adlc version
 ```
 
-- **Jira** uses the Python **standard library** only (no pip installs) — portable everywhere.
+- **Exit codes:** `0` ok, `1` error/refused, `2` bad usage, `3` push failed (commit kept).
+- **Jira** uses the Python **standard library** only (no pip installs), HTTPS only.
 - **Git** only — no dependency on the `gh` CLI.
-- Cross-shell: `adlc` (Git Bash / Unix), `adlc.cmd` (cmd/PowerShell), `adlc.ps1` (subset).
+- **Every shell:** `adlc` (bash, incl. macOS bash 3.2 and Git Bash), `adlc.ps1` (PowerShell
+  5.1 and 7+), `adlc.cmd` (cmd.exe). The bash and PowerShell versions are tested to produce
+  byte-identical files.
+
+### What `adlc ship` refuses to do
+- commit without a recorded **Gate 2** approval, or without `- Result: PASS` in
+  `verification.md`;
+- commit on a protected branch (`main`, `master`, `develop`, `trunk`, `production`, `release`);
+- commit files that look like secrets (`.env`, `*.pem`, `*.key`, `id_rsa*`, `.npmrc`,
+  `credentials.json`, …);
+- mark the run done when the push failed (it exits `3`, keeps the commit, and a re-run retries).
 
 ---
 
@@ -185,29 +207,59 @@ docs/adlc/tickets/<KEY>.md   local-mode ticket mirror
 2. **No hardcoded paths** — artifacts are written relative to the current project.
 3. **No secrets in the repo** — only `.env.example`; real tokens stay in your `.env`/shell.
 4. **Cross-OS** — `.gitattributes` forces LF on scripts (a CRLF bash script breaks on Linux);
-   scripts are marked executable in git; PowerShell + cmd + bash all covered.
+   scripts are marked executable in git; bash, PowerShell and cmd are all covered and tested
+   in CI on Linux, macOS and Windows.
 5. **`model: inherit`** — no assumption about the host's default model.
 6. **Graceful degradation** — no Jira creds → local tickets; no git remote → local commit; a
    failed push keeps the commit and reports it.
+7. **Agents can't approve for you** — prompts allow `adlc approve` only after the human says
+   so, and treat ticket/code/tool text as data, not instructions. See [SECURITY.md](SECURITY.md).
 
 ---
 
 ## 11. Install — shared, no marketplace (incl. Claude)
 
+**Requirements:** git, Python 3.8+ (installer and Jira mode only), and bash *or* PowerShell.
+
 ```bash
-git clone <repo-url> adlc-framework     # keep this folder — it IS the install
+git clone https://github.com/vishal6042/adlc-framework.git   # keep this folder — it IS the install
 cd adlc-framework
+./install.sh  <host> [target]           # macOS / Linux / Git Bash
 ./install.ps1 <host> [target]           # Windows PowerShell
-./install.sh  <host> [target]           # macOS/Linux/Git Bash
 #   host = claude | cline | gemini | universal | all
 ```
 
-The installer: runs `build.py`, sets `ADLC_HOME` + adds `core/scripts` to PATH once, and copies
-the host's instruction files into its **user-global** config. **No plugin, no marketplace —
-even for Claude.** Open a new terminal afterward so PATH takes effect.
+The installer (`install.py`, wrapped by both scripts): regenerates the adapters, sets
+`ADLC_HOME` and adds `core/scripts` to your PATH once, and copies the host's instruction files
+into its **user-global** config. **No plugin, no marketplace — even for Claude.** It never
+overwrites files it doesn't own: in `~/.gemini/GEMINI.md` and a project's `AGENTS.md` it
+manages only a marked `<!-- adlc:begin -->` block. Open a new terminal afterwards, then run:
 
-**Optional Jira:** copy `.env.example` → `.env`, or export `JIRA_BASE_URL`, `JIRA_EMAIL`,
-`JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`. Without them, the pipeline uses local ticket files.
+```bash
+adlc doctor
+```
+
+| Option | Effect |
+|--------|--------|
+| `--dry-run` | print every change, make none |
+| `--no-path` | leave PATH / `ADLC_HOME` alone |
+| `--uninstall` | remove everything the installer added (`all` also removes the PATH entry) |
+
+Claude Code honours `CLAUDE_CONFIG_DIR` if you use a custom config folder. Upgrading from v0.3
+removes the old `jira-ticket` / `spec-design` skills automatically.
+
+**Optional Jira:** copy `.env.example` → `.env` (in your project or this folder), or export
+`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY`. Without them, the pipeline
+uses local ticket files.
+
+### Troubleshooting
+| Symptom | Fix |
+|---------|-----|
+| `adlc: command not found` | open a new terminal; check `adlc doctor` via `$ADLC_HOME/scripts/adlc doctor` |
+| PowerShell: "running scripts is disabled" | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or call `adlc.cmd` |
+| `ship` refuses with "looks like secrets" | add the file to `.gitignore` (or commit it yourself if it is safe) |
+| `ship` exits 3 | the commit is safe locally; fix remote access, then `/adlc resume <KEY>` |
+| `jira: 401 Unauthorized` | regenerate the API token; `JIRA_EMAIL` must match the token's account |
 
 ---
 
@@ -249,10 +301,11 @@ even for Claude.** Open a new terminal afterward so PATH takes effect.
 | Layer | Tech |
 |-------|------|
 | Agents / skills / commands | Markdown with YAML frontmatter |
-| Deterministic engine | Bash + Windows `.cmd`/`.ps1` shims |
+| Deterministic engine | Bash (3.2+) with a PowerShell twin and a `.cmd` shim |
 | Jira integration | Python **standard library** (`urllib`) — Jira Cloud REST v3 |
 | VCS | Git (branch / commit / push / compare URL) |
-| Generator | `build.py` (Python 3, stdlib) |
+| Generator / installer | `build.py`, `install.py` (Python 3, stdlib) |
+| Quality | `unittest` suite + GitHub Actions on Linux, macOS, Windows; ShellCheck |
 | Hosts | Claude Code, Cline, Gemini CLI, `AGENTS.md` ecosystem |
 | Config | Env vars (`JIRA_*`, `ADLC_HOME`), `.env` (gitignored) |
 
@@ -285,14 +338,25 @@ adlc-framework/
 ├── core/              # single source of truth (edit here)
 │   ├── orchestrator.md
 │   ├── stages/{1-intake,2-spec,3-code,4-tests,5-verify,6-ship}.md
-│   ├── skills/{adlc-workflow,jira-ticket,spec-design}.md
+│   ├── skills/{adlc-workflow,adlc-jira-ticket,adlc-spec-design}.md
 │   ├── templates/{ticket,spec,state,verification}.md
-│   └── scripts/{adlc, adlc.ps1, adlc.cmd, jira_ticket.py, lib.sh}
+│   ├── scripts/{adlc, adlc.ps1, adlc.cmd, jira_ticket.py, lib.sh}
+│   └── VERSION
 ├── adapters/          # GENERATED by build.py — do not hand-edit
 │   ├── claude-code/  cline/  gemini/  universal/
-├── build.py           # regenerates adapters from core/
-├── install.sh / install.ps1
-├── .env.example  .gitattributes  README.md
+├── tests/             # unittest suite (CLI parity, Jira, build, installer)
+├── .github/workflows/ci.yml
+├── build.py           # regenerates adapters; --check, --package
+├── install.py         # the installer; install.sh / install.ps1 wrap it
+├── LICENSE  CHANGELOG.md  SECURITY.md  .env.example  README.md
+```
+
+### Development
+```bash
+python3 build.py              # after editing core/
+python3 build.py --check      # CI fails if adapters/ is stale
+python3 -m unittest discover -s tests -v
+python3 build.py --package    # dist/adlc-framework-<version>.zip for a release
 ```
 
 ---

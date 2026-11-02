@@ -1,8 +1,8 @@
 ---
-name: spec-design
+name: adlc-spec-design
 description: Author a spec/design document for an ADLC ticket before any code. Provides the required sections and the rule that every acceptance criterion maps to at least one planned test. Use when producing docs/adlc/<KEY>/spec.md — the doc humans review at Gate 1.
 ---
-# spec-design
+# adlc-spec-design
 
 Produce a concise, reviewable design doc — complete enough to approve, short enough to read.
 
@@ -26,7 +26,8 @@ Produce a concise, reviewable design doc — complete enough to approve, short e
 6. **Risks & rollback** — risks → mitigations; rollback = revert the branch.
 7. **Open questions** — anything needing a human decision at Gate 1 (empty if none).
 
-A template with these sections is seeded at `docs/adlc/<KEY>/` by the framework; fill it in.
+Start from the template: `@ADLC@ scaffold <KEY> spec` writes `docs/adlc/<KEY>/spec.md` with these
+sections (it never overwrites an existing spec). Fill it in.
 
 ## Output
 Return the path to `spec.md` and a 2–3 sentence approach summary for the Gate 1 prompt.

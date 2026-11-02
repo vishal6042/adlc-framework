@@ -1,6 +1,6 @@
 ---
 name: adlc-coder
-description: ADLC stage 3 (implementation). Implement the change from an APPROVED spec, on a feature branch, matching the codebase's style. Use PROACTIVELY only after Gate 1. Also handles fix cycles when verification fails.
+description: "ADLC stage 3 (implementation). Implement the change from an APPROVED spec, on a feature branch, matching the codebase's style. Use PROACTIVELY only after Gate 1. Also handles fix cycles when verification fails."
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---

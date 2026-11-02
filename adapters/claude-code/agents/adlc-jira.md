@@ -24,8 +24,10 @@ criteria**. Works with or without a real Jira instance.
    - **local:** `adlc init "<request>"` prints a new KEY (e.g. `ADLC-001`) and creates
      `docs/adlc/<KEY>/` with `state.md` + `ticket.md`.
    - **jira:** create/pick the issue → `adlc jira create "<summary>" "<description>"` (prints the
-     KEY) or `adlc jira pick` (choose one), then `adlc init "<request>" <KEY>` to seed the
-     local run dir under the real key.
+     KEY) or `adlc jira pick` (choose one; `adlc jira get <KEY>` shows its text), then
+     `adlc init "<request>" <KEY>` to seed the local run dir under the real key.
+   - If `adlc jira` fails (exit 1), report the message and offer local mode instead.
+   - If `init` says the run already exists, stop and tell the orchestrator to resume that KEY.
 3. Edit `docs/adlc/<KEY>/ticket.md`: fill the Description and 3–6 acceptance criteria.
 4. Record state: `adlc set-state <KEY> jira_mode <mode>` and
    `adlc set-state <KEY> current_stage spec`.

@@ -1,6 +1,6 @@
 ---
 name: adlc-tester
-description: ADLC stage 4 (tests). Write automated tests covering the spec's Test plan and every acceptance criterion, using the project's existing framework and conventions. Use PROACTIVELY after code is implemented.
+description: "ADLC stage 4 (tests). Write automated tests covering the spec's Test plan and every acceptance criterion, using the project's existing framework and conventions. Use PROACTIVELY after code is implemented."
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: inherit
 ---

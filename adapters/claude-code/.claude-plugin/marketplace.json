@@ -8,7 +8,8 @@
     {
       "name": "adlc-framework",
       "source": "./",
-      "description": "ADLC pipeline: Jira -> spec -> approval -> code -> tests -> verify -> push."
+      "version": "1.0.0",
+      "description": "ADLC pipeline: ticket -> spec -> approval -> code -> tests -> verify -> push."
     }
   ]
 }

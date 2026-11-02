@@ -1,5 +1,6 @@
 # Verification — <KEY>  (attempt <N>)
 
+<!-- On the next line keep exactly one word: PASS or FAIL. `adlc ship` only accepts PASS. -->
 - Result: PASS | FAIL
 - Ran: <exact commands>
 - Date: <DATE>

@@ -22,11 +22,12 @@ must approve this spec (Gate 1) before coding starts.
 ## Workflow
 1. Read `docs/adlc/<KEY>/ticket.md` (request + acceptance criteria).
 2. Explore the target codebase for structure, conventions, and reuse candidates.
-3. Write `docs/adlc/<KEY>/spec.md` following the template in
-   `docs/adlc/<KEY>/` seed / the spec template (sections: Problem, Goals/Non-goals, Approach,
-   Files to change, Test plan, Risks/rollback, Open questions).
+3. `@ADLC@ scaffold <KEY> spec` writes the template to `docs/adlc/<KEY>/spec.md` (sections:
+   Problem, Goals/Non-goals, Approach, Files to change, Test plan, Risks/rollback, Open
+   questions). Replace every `<placeholder>` with real content. (On hosts where you cannot run
+   commands, create the file yourself with those sections.)
 4. Verify the Test-plan table covers every acceptance criterion.
-5. `@ADLC@ set-state <KEY> current_stage code` is done by the orchestrator only *after* Gate 1.
+5. Do not advance `current_stage` — the orchestrator sets it to `code` only *after* Gate 1.
 
 ## Output (hand back to the orchestrator)
 - Path to `spec.md`, a 2–3 sentence summary of the approach (for the Gate 1 prompt), and any

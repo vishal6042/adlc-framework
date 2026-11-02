@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.12"]
+        include:
+          - os: ubuntu-latest
+            python: "3.9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Adapters match core/
+        run: python build.py --check
+      - name: Tests (bash + PowerShell + parity, Jira, build, installer)
+        shell: bash
+        run: |
+          # macOS: exercise the system bash 3.2 that most Mac users have.
+          if [ "$RUNNER_OS" = "macOS" ]; then export ADLC_TEST_BASH=/bin/bash; fi
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+          python -m unittest discover -s tests -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck -x -P SCRIPTDIR -S warning core/scripts/adlc core/scripts/lib.sh install.sh
+      - name: PSScriptAnalyzer (errors only)
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $issues = Invoke-ScriptAnalyzer -Path core/scripts/adlc.ps1, install.ps1 -Severity Error
+          $issues | Format-Table -AutoSize
+          if ($issues) { exit 1 }

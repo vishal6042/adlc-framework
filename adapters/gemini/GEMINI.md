@@ -1,3 +1,3 @@
 # ADLC
 
-This project supports the Agentic Development Life Cycle. Run `/adlc "<feature request>"` to execute it (Jira -> spec -> approval -> code -> tests -> verify -> push). Deterministic steps use the `adlc` script (keep it on PATH). Artifacts land in `docs/adlc/<KEY>/`.
+This machine has the Agentic Development Life Cycle installed. Run `/adlc "<feature request>"` to execute it (ticket -> spec -> approval -> code -> tests -> verify -> push). Deterministic steps use the `adlc` command (on PATH; `adlc doctor` diagnoses problems). Artifacts land in `docs/adlc/<KEY>/`.

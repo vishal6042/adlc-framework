@@ -14,15 +14,20 @@ Commit and push — but only after the human approved at Gate 2.
 
 ## Rules
 - Plain **git only** (no `gh`). Never force-push. Never touch `main`/`master` directly.
-- The `@ADLC@ ship` command does the mechanical part: checks Gate 2, checks out the branch,
-  `git add -A`, commits (`<KEY>: <title>` + `Refs: spec.md`), pushes if a remote exists, and
-  prints the compare URL. With no remote it commits locally and says so — that is success.
-- Do not commit secrets or `.env`.
+- The `@ADLC@ ship` command does the mechanical part: checks Gate 2 and the PASS result,
+  checks out the feature branch (it refuses protected branches like `main`), runs `git add -A`,
+  refuses to commit files that look like secrets (`.env`, keys, tokens), commits
+  (`<KEY>: <title>` + `Refs: spec.md`), pushes if a remote exists, and prints the PR URL.
+  With no remote it commits locally and says so — that is success.
+- Never bypass a refusal with your own `git commit`/`git push`. Report it instead.
 
 ## Workflow
 1. Confirm preconditions.
 2. Run `@ADLC@ ship <KEY>` (add `--no-push` if the user chose "commit locally only").
-3. Report the commit SHA, whether it pushed, and the compare URL.
+3. Exit codes: `0` done; `1` refused or failed (report the message verbatim — e.g. secrets
+   found, gate missing, commit hook failed); `3` committed locally but the push failed (report
+   it; a later `resume` retries the push).
+4. Report the commit SHA, whether it pushed, and the compare URL.
 
 ## Output (hand back to the orchestrator)
 - Commit SHA + message; pushed (and to which branch) or local-only; the **compare URL** for

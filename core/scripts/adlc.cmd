@@ -1,11 +1,13 @@
 @echo off
-REM Windows shim so `adlc` is callable from cmd.exe / PowerShell as well as Git Bash.
-REM Routes to the bash implementation (Git Bash ships with Git for Windows).
+REM Windows shim so `adlc` works from cmd.exe. It runs the PowerShell twin
+REM (adlc.ps1) rather than `bash`, because on Windows a bare `bash` is often
+REM WSL's bash.exe, which cannot see Windows paths the same way.
+REM Git Bash users get the bash `adlc` script directly (it is found first there).
 setlocal
-where bash >nul 2>nul
+where pwsh >nul 2>nul
 if %errorlevel%==0 (
-  bash "%~dp0adlc" %*
+  pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0adlc.ps1" %*
 ) else (
-  echo adlc: bash not found on PATH. Install Git for Windows, or call adlc.ps1 for the subset of commands it supports.>&2
-  exit /b 1
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0adlc.ps1" %*
 )
+exit /b %errorlevel%

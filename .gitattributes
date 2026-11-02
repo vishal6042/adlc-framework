@@ -11,3 +11,7 @@ adapters/**/scripts/adlc text eol=lf
 *.sh   text eol=lf
 *.py   text eol=lf
 *.md   text eol=lf
+
+# cmd.exe batch files are safest with CRLF.
+*.cmd  text eol=crlf
+*.yml  text eol=lf

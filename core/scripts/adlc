@@ -1,131 +1,260 @@
 #!/usr/bin/env bash
-# adlc — deterministic ADLC operations, LLM-independent and host-independent.
-# Any agent (Claude, Gemini, Cline, …) or a human runs these; they never
-# require a model. Reasoning stages (spec/code/tests) are done by the agent;
-# everything mechanical lives here.
+# adlc - deterministic ADLC operations, LLM-independent and host-independent.
+# Any agent (Claude, Gemini, Cline, ...) or a human runs these; they never need a
+# model. Reasoning stages (spec/code/tests) are done by the agent; everything
+# mechanical lives here. adlc.ps1 is the PowerShell twin and must stay in sync.
 #
-# Usage:
-#   adlc init "<request>" [KEY]     create docs/adlc/<KEY>/ + state.md (+ local ticket)
-#   adlc next-key                   print the next local ticket key (ADLC-00N)
-#   adlc status <KEY>               print the state file
-#   adlc get-state <KEY> <field>    read one state field
-#   adlc set-state <KEY> <f> <v>    write one state field
-#   adlc approve <KEY> gate1|gate2  record a human approval
-#   adlc branch <KEY>               print/ensure the feature branch name
-#   adlc compare-url <branch>       print the PR compare URL from origin
-#   adlc ship <KEY> [--no-push]     commit (+push) the change, print compare URL
-#
-# Jira create/pick lives in jira_ticket.py (needs network); this file is offline.
+# Exit codes: 0 ok, 1 error, 2 bad usage, 3 push failed (commit kept locally).
 
 set -euo pipefail
+# shellcheck source=lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
-cmd="${1:-help}"; shift || true
+usage() {
+  cat <<'EOF'
+adlc - deterministic ADLC operations
+
+Usage:
+  adlc init "<request>" [KEY]       create docs/adlc/<KEY>/ with state.md + ticket.md
+  adlc next-key                     print the next local ticket key (ADLC-00N)
+  adlc status <KEY>                 print the run's state file
+  adlc get-state <KEY> <field>      read one state field
+  adlc set-state <KEY> <f> <value>  write one state field
+  adlc approve <KEY> gate1|gate2    record a human approval
+  adlc scaffold <KEY> spec|verification [--force]
+                                    write a template into docs/adlc/<KEY>/
+  adlc branch <KEY>                 check out (create if needed) the feature branch
+  adlc compare-url <branch>         print the PR/MR URL for the origin remote
+  adlc ship <KEY> [--no-push]       commit (+push) the change, print the PR URL
+  adlc jira mode|pick|create ...    Jira Cloud helper (needs Python 3.8+)
+  adlc doctor                       check that git, python and config are usable
+  adlc version                      print the framework version
+
+Environment: ADLC_BRANCH_PREFIX (default adlc), ADLC_REMOTE (default origin),
+ADLC_DOCS_DIR (default <repo>/docs/adlc), JIRA_* (see .env.example).
+EOF
+}
+
+usage_error() { echo "adlc: $*" >&2; echo "run 'adlc help' for usage" >&2; exit 2; }
 
 next_key() {
-  local d max=0 n b
-  d="$(adlc_dir)/tickets"
-  if [ -d "$d" ]; then
-    for f in "$d"/ADLC-*.md; do
-      [ -e "$f" ] || continue
-      b="$(basename "$f" .md)"; n="${b#ADLC-}"
-      case "$n" in ''|*[!0-9]*) continue;; esac
-      n=$((10#$n)); [ "$n" -gt "$max" ] && max="$n"
-    done
-  fi
-  printf "ADLC-%03d" $((max + 1))
+  local d max=0 n b f
+  d="$(adlc_dir)"
+  for f in "$d"/tickets/ADLC-*.md "$d"/ADLC-*; do
+    [ -e "$f" ] || continue
+    b="$(basename "$f" .md)"; n="${b#ADLC-}"
+    case "$n" in ''|*[!0-9]*) continue;; esac
+    n=$((10#$n)); [ "$n" -gt "$max" ] && max="$n"
+  done
+  printf "ADLC-%03d\n" $((max + 1))
 }
 
-compare_url() { # branch
-  local url="${1:?branch required}" remote branch="$1"
-  remote="$(git remote get-url origin 2>/dev/null || true)"
-  [ -n "$remote" ] || { echo ""; return 0; }
-  url="${remote%.git}"
+compare_url() { # branch -> PR/MR URL, or empty when the remote isn't a web host
+  local branch="$1" remote url scheme rest hostpart host path
+  remote="${ADLC_REMOTE:-origin}"
+  url="$(git remote get-url "$remote" 2>/dev/null || true)"
+  [ -n "$url" ] || { echo ""; return 0; }
+  url="${url%/}"; url="${url%.git}"
   case "$url" in
-    git@*:*)      # scp-style: git@host:owner/repo
-                  host="${url#git@}"; host="${host%%:*}"
-                  path="${url#git@*:}"
-                  url="https://$host/$path" ;;
-    ssh://git@*)  url="https://${url#ssh://git@}" ;;
+    http://*|https://*|ssh://*|git://*)
+      scheme="${url%%://*}"; rest="${url#*://}"
+      hostpart="${rest%%/*}"; path="${rest#*/}"
+      [ "$path" != "$rest" ] || { echo ""; return 0; }
+      hostpart="${hostpart##*@}"            # drop user:token@ (never print credentials)
+      case "$scheme" in
+        http|https) host="$hostpart" ;;     # keep a custom web port
+        *) host="${hostpart%%:*}"; scheme=https ;;  # ssh/git port is not the web port
+      esac
+      ;;
+    *@*:*) # scp-style: git@host:owner/repo
+      rest="${url#*@}"; host="${rest%%:*}"; path="${rest#*:}"; scheme=https ;;
+    *) echo ""; return 0 ;;                  # local path / file:// remote
   esac
-  echo "$url/compare/$branch?expand=1"
+  local base="$scheme://$host/$path"
+  case "$host" in
+    *gitlab*)    echo "$base/-/merge_requests/new?merge_request%5Bsource_branch%5D=$branch" ;;
+    *bitbucket*) echo "$base/pull-requests/new?source=$branch" ;;
+    *)           echo "$base/compare/$branch?expand=1" ;;
+  esac
 }
+
+# Files that must never be committed by an automated ship.
+SECRET_RE='(^|/)(\.env(\.[^/]*)?|[^/]*\.(pem|key|p12|pfx|keystore|jks|token)|id_(rsa|dsa|ecdsa|ed25519)[^/]*|\.npmrc|\.pypirc|\.netrc|credentials(\.json)?|secrets?\.(json|ya?ml|toml))$'
+SECRET_OK_RE='\.(example|sample|template|dist)$'
+
+cmd="${1:-help}"; shift || true
+adlc_load_dotenv
 
 case "$cmd" in
+  help|-h|--help) usage ;;
+  version|-v|--version) echo "adlc $(adlc_version)" ;;
+
   next-key) next_key ;;
 
-  jira) # mode|pick|create ...  — delegates to jira_ticket.py with a real interpreter
-    py="$(adlc_python)" || die "no working python interpreter found (tried python3/py/python)"
-    "$py" "$(adlc_script_dir)/jira_ticket.py" "$@"
+  jira) # mode|pick|create ...  - delegates to jira_ticket.py with a real interpreter
+    py="$(adlc_python)" || die "no working Python 3.8+ found (tried python3, py, python)"
+    exec "$py" "$ADLC_LIB_DIR/jira_ticket.py" ${@+"$@"}
     ;;
 
   init) # "<request>" [KEY]
-    req="${1:?request required}"; key="${2:-$(next_key)}"
-    mkdir -p "$(key_dir "$key")" "$(adlc_dir)/tickets"
+    [ $# -ge 1 ] && [ -n "$1" ] || usage_error 'init needs a request: adlc init "<request>" [KEY]'
+    req="$(one_line "$1")"; key="${2:-$(next_key)}"
+    require_key "$key"
+    [ -e "$(state_file "$key")" ] && die "run $key already exists ($(state_file "$key")); use: adlc status $key"
+    kd="$(key_dir "$key")"; td="$(adlc_dir)/tickets"
+    mkdir -p "$kd" "$td"
     today="$(date +%Y-%m-%d)"
-    slug="$(slugify "$req")"
-    branch="${ADLC_BRANCH_PREFIX:-adlc}/$key-$slug"
-    # seed state.md from template with substitutions
-    sed -e "s|<KEY>|$key|g" -e "s|<TITLE>|$req|g" \
-        -e "s|<DATE>|$today|g" -e "s|<BRANCH>|$branch|g" \
-        "$(adlc_templates_dir)/state.md" > "$(state_file "$key")"
-    # seed a local ticket stub (jira_ticket.py may overwrite in jira mode)
-    sed -e "s|<KEY>|$key|g" -e "s|<TITLE>|$req|g" -e "s|<DATE>|$today|g" \
-        "$(adlc_templates_dir)/ticket.md" \
-        | tee "$(key_dir "$key")/ticket.md" > "$(adlc_dir)/tickets/$key.md"
+    branch="${ADLC_BRANCH_PREFIX:-adlc}/$key-$(slugify "$req")"
+    git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "invalid branch name '$branch' (check ADLC_BRANCH_PREFIX)"
+    render_template "$(adlc_templates_dir)/state.md" \
+      "<KEY>" "$key" "<TITLE>" "$req" "<DATE>" "$today" "<BRANCH>" "$branch" > "$(state_file "$key")"
+    render_template "$(adlc_templates_dir)/ticket.md" \
+      "<KEY>" "$key" "<TITLE>" "$req" "<DATE>" "$today" > "$kd/ticket.md"
+    cp "$kd/ticket.md" "$td/$key.md"
     echo "$key"
     ;;
 
-  status)      key="${1:?KEY required}"; cat "$(state_file "$key")" ;;
-  get-state)   get_state "${1:?KEY}" "${2:?field}" ;;
-  set-state)   set_state "${1:?KEY}" "${2:?field}" "${3:?value}"; echo "ok" ;;
+  status)
+    [ $# -ge 1 ] || usage_error "status needs a KEY"
+    require_run "$1"; cat "$(state_file "$1")" ;;
+
+  get-state)
+    [ $# -ge 2 ] || usage_error "get-state needs <KEY> <field>"
+    require_key "$1"; get_state "$1" "$2" ;;
+
+  set-state)
+    [ $# -ge 3 ] || usage_error "set-state needs <KEY> <field> <value>"
+    require_run "$1"; set_state "$1" "$2" "$3"; echo "ok" ;;
 
   approve)
-    key="${1:?KEY}"; gate="${2:?gate1|gate2}"
+    [ $# -ge 2 ] || usage_error "approve needs <KEY> gate1|gate2"
+    key="$1"; gate="$2"; require_run "$key"
     case "$gate" in
       gate1) set_state "$key" gate1_spec_approved true ;;
       gate2) set_state "$key" gate2_push_approved true ;;
-      *) die "gate must be gate1 or gate2" ;;
+      *) usage_error "gate must be gate1 or gate2" ;;
     esac
     log_state "$key" "$gate: approved by user"
     echo "recorded $gate approval for $key"
     ;;
 
+  scaffold) # KEY spec|verification [--force]
+    [ $# -ge 2 ] || usage_error "scaffold needs <KEY> spec|verification"
+    key="$1"; kind="$2"; force="${3:-}"; require_run "$key"
+    case "$kind" in spec|verification) ;; *) usage_error "scaffold kind must be spec or verification" ;; esac
+    out="$(key_dir "$key")/$kind.md"
+    if [ -e "$out" ] && [ "$force" != "--force" ]; then
+      echo "$out (exists, left unchanged)"; exit 0
+    fi
+    attempts="$(get_state "$key" verify_attempts)"
+    case "$attempts" in ''|*[!0-9]*) attempts=0 ;; esac
+    render_template "$(adlc_templates_dir)/$kind.md" \
+      "<KEY>" "$key" "<TITLE>" "$(get_state "$key" title)" \
+      "<DATE>" "$(date +%Y-%m-%d)" "<N>" "$((attempts + 1))" > "$out"
+    echo "$out"
+    ;;
+
   branch)
-    key="${1:?KEY}"; b="$(get_state "$key" branch)"
+    [ $# -ge 1 ] || usage_error "branch needs a KEY"
+    key="$1"; require_run "$key"; require_git_repo
+    b="$(get_state "$key" branch)"
     [ -n "$b" ] || die "no branch recorded for $key"
-    git rev-parse --abbrev-ref HEAD 2>/dev/null | grep -qx "$b" || git switch -c "$b" 2>/dev/null || git switch "$b"
+    switch_to_branch "$b"
     echo "$b"
     ;;
 
-  compare-url) compare_url "${1:?branch}" ;;
+  compare-url)
+    [ $# -ge 1 ] || usage_error "compare-url needs a branch"
+    compare_url "$1" ;;
 
   ship)
-    key="${1:?KEY}"; push=1; [ "${2:-}" = "--no-push" ] && push=0
-    [ "$(get_state "$key" gate2_push_approved)" = "true" ] || die "gate2 not approved for $key"
+    [ $# -ge 1 ] || usage_error "ship needs a KEY"
+    key="$1"; shift; push=1
+    for a in ${@+"$@"}; do
+      case "$a" in --no-push) push=0 ;; *) usage_error "unknown ship option: $a" ;; esac
+    done
+    require_run "$key"; require_git_repo
+
+    # Deterministic gates: the script refuses even if an agent skips a step.
+    [ "$(get_state "$key" gate2_push_approved)" = "true" ] \
+      || die "gate2 not approved for $key (run: adlc approve $key gate2)"
+    vf="$(key_dir "$key")/verification.md"
+    [ -f "$vf" ] || die "no verification report at $vf; run the verify stage first"
+    result="$(awk '/Result:/ { gsub(/[*_` \t-]/, ""); print toupper($0); exit }' "$vf" | tr -d '\r')"
+    [ "$result" = "RESULT:PASS" ] || die "verification for $key is not PASS (found '${result:-nothing}' in $vf)"
+
     b="$(get_state "$key" branch)"
-    git rev-parse --abbrev-ref HEAD 2>/dev/null | grep -qx "$b" || git switch -c "$b" 2>/dev/null || git switch "$b"
+    [ -n "$b" ] || die "no branch recorded for $key"
+    switch_to_branch "$b"
+
     git add -A
-    title="$(get_state "$key" title)"
-    git commit -q -m "$key: $title" -m "Refs: docs/adlc/$key/spec.md" || echo "adlc: nothing to commit"
+    flagged="$(git diff --cached --name-only | grep -E "$SECRET_RE" | grep -Ev "$SECRET_OK_RE" || true)"
+    if [ -n "$flagged" ]; then
+      printf '%s\n' "$flagged" | while IFS= read -r f; do git reset -q -- "$f" 2>/dev/null || true; done
+      die "refusing to commit files that look like secrets:
+$flagged
+Add them to .gitignore (or commit them yourself if they are safe), then re-run: adlc ship $key"
+    fi
+
+    # Record the outcome *before* committing so the commit carries the final
+    # state and the working tree is clean afterwards.
+    set_state "$key" current_stage "done"
+    log_state "$key" "ship: committed on $b"
+    git add -A
+
+    if git diff --cached --quiet; then
+      echo "adlc: nothing new to commit on $b"
+    else
+      count="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+      title="$(get_state "$key" title)"
+      if ! git commit -q -m "$key: $title" -m "Refs: docs/adlc/$key/spec.md"; then
+        set_state "$key" current_stage ship
+        log_state "$key" "ship: commit FAILED"
+        die "git commit failed (pre-commit hook or missing user.name/user.email?); changes are still staged"
+      fi
+      echo "committed $count file(s)"
+    fi
     sha="$(git rev-parse --short HEAD)"
-    log_state "$key" "ship: committed $sha"
-    if [ "$push" = "1" ] && git remote get-url origin >/dev/null 2>&1; then
-      if git push -u origin "$b"; then
-        log_state "$key" "ship: pushed $b"
-        url="$(compare_url "$b")"; [ -n "$url" ] && echo "PR: $url"
+
+    remote="${ADLC_REMOTE:-origin}"
+    if [ "$push" = "1" ] && git remote get-url "$remote" >/dev/null 2>&1; then
+      if git push -u "$remote" "$b"; then
+        echo "pushed $sha to $remote/$b"
+        url="$(compare_url "$b")"; [ -z "$url" ] || echo "PR: $url"
       else
-        # push failing must not lose the local commit or corrupt state
-        echo "adlc: push FAILED — commit $sha kept locally on $b (fix remote/auth, then: git push -u origin $b)" >&2
+        # The commit is safe locally. Put the stage back to ship so resume retries
+        # the push (this leaves state.md modified; the retry commits it).
+        set_state "$key" current_stage ship
         log_state "$key" "ship: push FAILED; local commit $sha kept"
+        echo "adlc: push FAILED - commit $sha kept locally on $b. Fix the remote/auth, then re-run: adlc ship $key" >&2
+        exit 3
       fi
     else
-      echo "committed locally only (no remote or --no-push): $sha on $b"
+      echo "committed locally only (no '$remote' remote or --no-push): $sha on $b"
     fi
-    set_state "$key" current_stage done
     ;;
 
-  help|*)
-    sed -n '2,20p' "$0"
+  doctor)
+    ok=1
+    echo "adlc $(adlc_version)  ($ADLC_LIB_DIR)"
+    echo "bash      $BASH_VERSION"
+    if command -v git >/dev/null 2>&1; then echo "git       $(git --version | sed 's/git version //')"
+    else echo "git       MISSING (required)"; ok=0; fi
+    if py="$(adlc_python)"; then echo "python    $("$py" -c 'import sys; print(sys.version.split()[0])') ($py)"
+    else echo "python    not found (only needed for Jira mode)"; fi
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "project   $(adlc_project_root)"
+      echo "remote    $(git remote get-url "${ADLC_REMOTE:-origin}" 2>/dev/null | sed -E 's#://[^/@]*@#://#' || echo none)"
+    else
+      echo "project   not a git repository (adlc branch/ship need one)"
+    fi
+    if [ -n "${JIRA_BASE_URL:-}" ] && [ -n "${JIRA_EMAIL:-}" ] && [ -n "${JIRA_API_TOKEN:-}" ]; then
+      echo "jira      configured ($JIRA_BASE_URL, project ${JIRA_PROJECT_KEY:-ADLC})"
+    else
+      echo "jira      not configured -> local ticket mode"
+    fi
+    [ "$ok" = 1 ] || exit 1
     ;;
+
+  *) usage_error "unknown command: $cmd" ;;
 esac
