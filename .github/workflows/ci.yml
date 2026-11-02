@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,6 +25,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Tool versions
+        shell: bash
+        run: |
+          bash --version | head -1
+          git --version
+          (pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' || powershell -NoProfile -Command '$PSVersionTable.PSVersion.ToString()') 2>/dev/null || true
       - name: Adapters match core/
         run: python build.py --check
       - name: Tests (bash + PowerShell + parity, Jira, build, installer)
@@ -34,7 +40,7 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ]; then export ADLC_TEST_BASH=/bin/bash; fi
           git config --global user.email ci@example.com
           git config --global user.name CI
-          python -m unittest discover -s tests -v
+          python tests/ci_run.py
 
   lint:
     runs-on: ubuntu-latest
@@ -45,8 +51,20 @@ jobs:
       - name: PSScriptAnalyzer (errors only)
         shell: pwsh
         run: |
-          Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
-          $issues = Invoke-ScriptAnalyzer -Path core/scripts/adlc.ps1, install.ps1 -Severity Error
-          $issues | Format-Table -AutoSize
-          if ($issues) { exit 1 }
+          try {
+            Set-PSRepository PSGallery -InstallationPolicy Trusted
+            Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -ErrorAction Stop
+          } catch {
+            Write-Output "::error title=PSScriptAnalyzer install failed::$($_.Exception.Message)"
+            exit 1
+          }
+          $failed = $false
+          foreach ($file in @('core/scripts/adlc.ps1', 'install.ps1')) {
+            # -Path takes a single file
+            foreach ($i in @(Invoke-ScriptAnalyzer -Path $file -Severity Error)) {
+              $failed = $true
+              Write-Output "::error file=$file,line=$($i.Line),title=$($i.RuleName)::$($i.Message)"
+            }
+          }
+          if ($failed) { exit 1 }
+          'No PSScriptAnalyzer errors.'

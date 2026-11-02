@@ -63,7 +63,9 @@ JIRA_* (see .env.example).
 # Windows PowerShell (and pwsh < 7.3) drop embedded double quotes when passing
 # arguments to native programs; escape them the way the C runtime expects.
 function Convert-NativeArg([string]$a) {
-  $legacy = $PSVersionTable.PSVersion -lt [version]'7.3'
+  # Compare numbers: PSVersion is [version] on 5.1 but [semver] on 7+.
+  $v = $PSVersionTable.PSVersion
+  $legacy = ($v.Major -lt 7) -or ($v.Major -eq 7 -and $v.Minor -lt 3)
   if (-not $legacy) {
     $mode = Get-Variable PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue
     $legacy = ($mode -eq 'Legacy')

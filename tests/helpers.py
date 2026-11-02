@@ -98,8 +98,7 @@ class TempRepo:
         self._tmp = tempfile.TemporaryDirectory()
         self.path = Path(self._tmp.name) / "proj"
         self.path.mkdir()
-        git(self.path, "init", "-q")
-        git(self.path, "checkout", "-q", "-b", "main")
+        git(self.path, "init", "-q", "-b", "main")
         git(self.path, "config", "user.email", "test@example.com")
         git(self.path, "config", "user.name", "ADLC Test")
         git(self.path, "config", "core.autocrlf", "false")
